@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carnicería MYG — Letreros</title>
+<style>
+  :root{ --cw:65mm; --ch:42mm; --cols:3; --bw:1.2pt; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:#e9eaee; font-family:Segoe UI,Arial,sans-serif; color:#1a1a1a; }
+
+  /* ---------- BARRA ---------- */
+  .toolbar{ position:sticky; top:0; z-index:60; background:#1f2430; color:#fff; padding:8px 14px;
+    display:flex; flex-direction:column; gap:8px; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+  .barrow{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .toolbar h1{ font-size:14px; margin:0 6px 0 0; font-weight:700; white-space:nowrap; }
+  .grp{ display:flex; align-items:center; gap:6px; background:#2b3242; padding:6px 10px; border-radius:8px; }
+  .grp.big{ background:#143a2a; } .grp.sel{ background:#262d3b; }
+  .grp label{ font-size:11px; opacity:.85; white-space:nowrap; }
+  .grp input[type=number]{ width:52px; padding:4px 6px; border:none; border-radius:5px; font-size:13px; text-align:center; }
+  select{ padding:5px 6px; border:none; border-radius:6px; font-size:12px; max-width:170px; }
+  .toolbar button{ border:none; border-radius:8px; padding:7px 11px; font-size:13px; font-weight:600; cursor:pointer; background:#39435a; color:#fff; }
+  .toolbar button:hover{ filter:brightness(1.15); }
+  .btn-print{ background:#e8242b !important; } .btn-add{ background:#1f9d57 !important; } .btn-eq{ background:#c98a00 !important; }
+  .mini{ padding:5px 9px !important; font-size:14px !important; }
+  #selbar.off{ opacity:.4; pointer-events:none; }
+  .hint{ font-size:11px; opacity:.8; max-width:560px; line-height:1.35; }
+
+  /* ---------- GRILLA ---------- */
+  .sheet-wrap{ padding:22px; display:flex; justify-content:center; }
+  .grid{ display:flex; flex-wrap:wrap; align-items:flex-start; width:calc(var(--cw)*var(--cols));
+         background:#fff; box-shadow:0 4px 20px rgba(0,0,0,.15); }
+  .tag{ width:var(--cw); height:var(--ch); border:var(--bw) solid #000; margin:-0.6pt 0 0 -0.6pt;
+        background:#fff; position:relative; overflow:hidden; }
+
+  .el{ position:absolute; }
+  .inner{ position:absolute; left:0; top:0; font-size:100px; line-height:1; white-space:nowrap;
+          font-family:"Arial Black",Arial,sans-serif; font-weight:900; letter-spacing:-3px; transform-origin:top left; outline:none; }
+  .el.title .inner{ color:#000; } .el.sub .inner{ color:#000; } .el.price .inner{ color:#e30613; }
+  .el.price .cur{ font-size:.5em; vertical-align:.35em; }
+  .inner:focus{ background:#fff7cc; }
+  .el.sel{ outline:1.5px dashed #2b7cff; }
+
+  .h{ position:absolute; display:none; z-index:8; touch-action:none; background:transparent; }
+  .h.e::before,.h.s::before,.h.se::before{ content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+       background:#2b7cff; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.45); border-radius:50%; width:13px; height:13px; }
+  .h.se::before{ border-radius:3px; width:15px; height:15px; }
+  .h.move{ left:-16px; top:-16px; width:30px; height:30px; cursor:move; }
+  .h.move::before{ content:"✥"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+       background:#2b7cff; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.45); color:#fff; font:700 12px/1 Arial;
+       border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
+  .h.e{ right:-13px; top:calc(50% - 13px); width:26px; height:26px; cursor:ew-resize; }
+  .h.s{ left:calc(50% - 13px); bottom:-13px; width:26px; height:26px; cursor:ns-resize; }
+  .h.se{ right:-14px; bottom:-14px; width:28px; height:28px; cursor:nwse-resize; }
+  .el:hover .h{ display:block; opacity:.5; }
+  .el.sel .h{ display:block; opacity:1; }
+
+  .del{ position:absolute; top:1px; right:1px; width:20px; height:20px; border-radius:50%; background:#e8242b; color:#fff;
+        border:none; font-size:12px; line-height:18px; cursor:pointer; display:none; padding:0; z-index:9; }
+  .tag:hover .del, .tag:has(.el.sel) .del{ display:block; }
+
+  /* ---------- IMPRESIÓN ---------- */
+  @media print{
+    @page{ size:A4; margin:7mm; }
+    html,body{ background:#fff; }
+    .toolbar,.del,.h{ display:none !important; }
+    .sheet-wrap{ padding:0; } .grid{ box-shadow:none; }
+    .tag{ break-inside:avoid; } .el.sel{ outline:none; } .inner:focus{ background:none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="barrow">
+    <h1>🥩 Carnicería MYG</h1>
+    <div class="grp"><label>Columnas</label><input type="number" id="cols" min="1" max="6" value="3"></div>
+    <div class="grp"><label>Ancho mm</label><input type="number" id="cw" min="25" max="200" value="65"></div>
+    <div class="grp"><label>Alto mm</label><input type="number" id="ch" min="18" max="160" value="42"></div>
+    <button class="btn-eq" id="eq" title="Todos los cuadros del mismo tamaño para cortar parejo">▦ Igualar cuadros</button>
+    <button class="btn-add" id="add">＋ Agregar</button>
+    <button id="dup">⧉ Duplicar</button>
+    <button id="reset">↺ Restablecer</button>
+    <button class="btn-print" id="print">🖨 Imprimir / PDF</button>
+  </div>
+  <div class="barrow">
+    <div class="grp big"><label>🌐 TODO el panel:</label><label>Fuente</label><select id="fontAll"></select>
+      <button class="mini" id="allMinus">A−</button><button class="mini" id="allPlus">A＋</button></div>
+    <div class="grp sel off" id="selbar"><label>✏️ Texto elegido:</label><label>Fuente</label><select id="fontSel"></select>
+      <button class="mini" id="selMinus" title="Achicar">A−</button><button class="mini" id="selPlus" title="Agrandar">A＋</button>
+      <button class="mini" id="selWless" title="Más angosto">↔−</button><button class="mini" id="selWmore" title="Más ancho">↔＋</button>
+      <button class="mini" id="selHless" title="Más bajo">↕−</button><button class="mini" id="selHmore" title="Más alto">↕＋</button></div>
+    <div class="hint">Clic en un texto para escribir o cambiarle la fuente. Cuando está elegido salen tiradores: ● lados = ancho/alto, ◣ esquina = ambos, ✥ arriba-izquierda = mover. También sirven los botones ↔ (ancho) y ↕ (alto).</div>
+  </div>
+</div>
+
+<div class="sheet-wrap"><div class="grid" id="grid"></div></div>
+
+<script>
+const FONTS=["Arial Black","Impact","Franklin Gothic Heavy","Arial","Arial Narrow","Bahnschrift","Tahoma","Verdana","Trebuchet MS","Segoe UI Black","Calibri","Georgia","Times New Roman","Courier New","Comic Sans MS"];
+const DEFAULT=[
+ ["VINAGRE","BLANCO TINTO 500CC","1.020"],["VINAGRE","MANZANA 500CC","2.020"],["CHORITOS","SAN JOSE","1.760"],
+ ["ATUN","COLISEO DESMENUSADO","760"],["CABALLA","COLISEO","1.500"],["ATUN ACEITE","ROBINSON CRUSOE","1.820"],
+ ["ATUN","VAN CAMPS","1.840"],["ACEITE","MIRAFLORES 900CC","2.550"],["LECHE NIDO","BUEN DIA 130G","1.350"],
+ ["AVENA","VIVO 700GR","1.950"],["NESTUM","5 CEREALES 250GR","2.830"],["MAIZENA","","540"],
+ ["SEMOLA","LUCHETTI 1KG","2.980"],["SEMOLA","LUCCHETTI 250G","950"],["CREMA","NESTLÉ 157GR","1.480"],
+ ["CREMA","NESTLÉ 236GR","1.750"],["CONDENSADA","LECHE NESTLÉ","1.790"],["AJÍ PEBRE","DON JUAN","1.650"],
+ ["AJI CREMA","DON JUAN","1.450"],["KETCHUP","DON JUAN","1.550"],["MOSTAZA","DON JUAN","1.580"]
+];
+// posición/tamaño inicial por rol, en fracciones del cuadro {fx,fy,fw,fh}
+const ROLEY={title:0.05, sub:0.35, price:0.52};
+const ROLEH={title:0.26, sub:0.14, price:0.42};
+const KEY="letreros_carniceria_v4";
+const grid=document.getElementById("grid");
+let selEl=null;
+
+function fillFont(sel){ sel.innerHTML=""; FONTS.forEach(f=>{const o=document.createElement("option");o.value=f;o.textContent=f;o.style.fontFamily=f;sel.appendChild(o);}); }
+fillFont(document.getElementById("fontAll")); fillFont(document.getElementById("fontSel"));
+
+function load(){ try{const s=localStorage.getItem(KEY); if(s)return JSON.parse(s);}catch(e){} return null; }
+function save(){
+  const data=[...grid.querySelectorAll(".tag")].map(t=>{
+    const g=r=>{ const el=t.querySelector(".el."+r); if(!el)return null;
+      return {txt:txOf(el), font:el.dataset.font||"",
+              fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh}; };
+    return { title:g("title"), sub:g("sub"), price:g("price") };
+  });
+  try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){}
+}
+function txOf(el){ const n=el.querySelector(".num")||el.querySelector(".inner"); return n.textContent; }
+const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
+
+function layoutEl(el){
+  const tag=el.closest(".tag"); const cw=tag.clientWidth, ch=tag.clientHeight;
+  const W=el.dataset.fw*cw, H=el.dataset.fh*ch;
+  el.style.left=(el.dataset.fx*cw)+"px"; el.style.top=(el.dataset.fy*ch)+"px";
+  el.style.width=W+"px"; el.style.height=H+"px";
+  const inner=el.querySelector(".inner");
+  const nw=inner.offsetWidth||1, nh=inner.offsetHeight||1;
+  inner.style.transform="scale("+(W/nw)+","+(H/nh)+")";
+}
+function relayoutAll(){ grid.querySelectorAll(".el").forEach(layoutEl); }
+// tamaño real (px) de una celda, para proporciones correctas a cualquier mm/columna
+function cellPx(){ const t=grid.querySelector(".tag"); if(t&&t.clientWidth&&t.clientHeight) return [t.clientWidth,t.clientHeight];
+  const p=document.createElement("div"); p.className="tag"; p.style.visibility="hidden"; grid.appendChild(p); const w=p.clientWidth||246,h=p.clientHeight||159; p.remove(); return [w,h]; }
+// re-deriva el ancho proporcional al texto (evita que se deforme al cambiar mm de la celda)
+function refitFrac(el){ const tag=el.closest(".tag"); if(!tag)return; const cw=tag.clientWidth, ch=tag.clientHeight;
+  const inner=el.querySelector(".inner"); const nw=inner.offsetWidth||1, nh=inner.offsetHeight||1;
+  const H=el.dataset.fh*ch; el.dataset.fw=(H*(nw/nh))/cw; el.dataset.fx=(1-el.dataset.fw)/2; }
+function clearTagInline(){ grid.querySelectorAll(".tag").forEach(t=>{ t.style.width=""; t.style.height=""; }); }
+
+function makeEl(role,o){
+  const el=document.createElement("div"); el.className="el "+role;
+  el.dataset.fx=o.fx; el.dataset.fy=o.fy; el.dataset.fw=o.fw; el.dataset.fh=o.fh; el.dataset.font=o.font||"";
+  const inner=document.createElement("div"); inner.className="inner";
+  if(o.font) inner.style.fontFamily=o.font;
+  if(role==="price"){ inner.innerHTML='<span class="cur">$</span><span class="num" contenteditable="true"></span>'; inner.querySelector(".num").textContent=o.txt; }
+  else { inner.setAttribute("contenteditable","true"); inner.textContent=o.txt; }
+  el.appendChild(inner);
+  ["move","e","s","se"].forEach(a=>{ const h=document.createElement("div"); h.className="h "+a; h.dataset.act=a; el.appendChild(h); });
+  // edición
+  const editable = inner.querySelector(".num")||inner;
+  editable.addEventListener("input",()=>{ layoutEl(el); debSave(); });
+  editable.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); editable.blur();} });
+  el.addEventListener("mousedown",e=>{ if(e.target.classList.contains("h"))return; selectEl(el); });
+  // tiradores
+  el.querySelectorAll(".h").forEach(h=>h.addEventListener("pointerdown",e=>startDrag(e,el,h.dataset.act)));
+  return el;
+}
+
+function startDrag(e,el,act){
+  e.preventDefault(); e.stopPropagation(); selectEl(el);
+  const tag=el.closest(".tag"), cw=tag.clientWidth, ch=tag.clientHeight;
+  const sx=e.clientX, sy=e.clientY;
+  const fx=+el.dataset.fx, fy=+el.dataset.fy, fw=+el.dataset.fw, fh=+el.dataset.fh;
+  e.target.setPointerCapture(e.pointerId);
+  const mv=ev=>{
+    const dx=(ev.clientX-sx)/cw, dy=(ev.clientY-sy)/ch;
+    if(act==="move"){ el.dataset.fx=Math.max(-0.2,Math.min(1-Math.min(fw,0.12),fx+dx)); el.dataset.fy=Math.max(-0.2,Math.min(1-Math.min(fh,0.12),fy+dy)); }
+    if(act==="e"||act==="se"){ el.dataset.fw=Math.max(0.03,fw+dx); }
+    if(act==="s"||act==="se"){ el.dataset.fh=Math.max(0.03,fh+dy); }
+    layoutEl(el);
+  };
+  const up=ev=>{ try{e.target.releasePointerCapture(e.pointerId);}catch(_){ } e.target.removeEventListener("pointermove",mv); e.target.removeEventListener("pointerup",up); save(); };
+  e.target.addEventListener("pointermove",mv); e.target.addEventListener("pointerup",up);
+}
+
+function makeTag(o){
+  const tag=document.createElement("div"); tag.className="tag";
+  const del=document.createElement("button"); del.className="del"; del.textContent="✕";
+  del.addEventListener("click",()=>{ tag.remove(); if(selEl&&!document.contains(selEl))clearSel(); save(); });
+  tag.appendChild(del);
+  tag.appendChild(makeEl("title",o.title));
+  if(o.sub && (o.sub.txt||"").trim().length) tag.appendChild(makeEl("sub",o.sub));
+  tag.appendChild(makeEl("price",o.price));
+  return tag;
+}
+
+// fracciones iniciales (proporcional, sin distorsión) a partir del texto
+function initFrac(role,txt,tagW,tagH){
+  const m=document.createElement("div"); m.className="inner"; m.style.position="absolute"; m.style.visibility="hidden"; m.style.fontSize="100px";
+  if(role==="price"){ m.innerHTML='<span style="font-size:.5em;vertical-align:.35em">$</span><span></span>'; m.lastChild.textContent=txt; }
+  else { m.textContent=txt; }
+  grid.appendChild(m); const nw=m.offsetWidth||1, nh=m.offsetHeight||1; m.remove();
+  const aspect=nw/nh;
+  let fh=ROLEH[role]; let Wpx=fh*tagH*aspect; let fw=Wpx/tagW;
+  if(fw>0.94){ fw=0.94; fh=(fw*tagW/aspect)/tagH; }
+  return {fx:(1-fw)/2, fy:ROLEY[role], fw, fh, txt, font:""};
+}
+
+function buildDefault(){
+  const [probeW,probeH]=cellPx();
+  return DEFAULT.map(d=>({
+    title:initFrac("title",d[0],probeW,probeH),
+    sub: d[1] ? initFrac("sub",d[1],probeW,probeH) : {fx:0,fy:0,fw:0,fh:0,txt:"",font:""},
+    price:initFrac("price",d[2],probeW,probeH)
+  }));
+}
+
+function selectEl(el){ if(selEl)selEl.classList.remove("sel"); selEl=el; el.classList.add("sel"); syncSel(); }
+function clearSel(){ if(selEl)selEl.classList.remove("sel"); selEl=null; syncSel(); }
+function syncSel(){ const bar=document.getElementById("selbar"); if(!selEl){bar.classList.add("off");return;} bar.classList.remove("off");
+  const f=(selEl.dataset.font||"Arial Black"); document.getElementById("fontSel").value=FONTS.includes(f)?f:FONTS[0]; }
+
+function render(data){
+  grid.innerHTML="";
+  const src = data || buildDefault();
+  src.forEach(o=>grid.appendChild(makeTag(o)));
+  requestAnimationFrame(()=>{ relayoutAll(); save(); });
+}
+
+// ---- panel ----
+function setVar(n,v){ document.documentElement.style.setProperty(n,v); requestAnimationFrame(relayoutAll); }
+document.getElementById("cols").addEventListener("input",e=>setVar("--cols",e.target.value||3));
+function applyCellSize(){ clearTagInline();
+  document.documentElement.style.setProperty("--cw",(document.getElementById("cw").value||65)+"mm");
+  document.documentElement.style.setProperty("--ch",(document.getElementById("ch").value||42)+"mm");
+  requestAnimationFrame(()=>{ grid.querySelectorAll(".el").forEach(refitFrac); relayoutAll(); save(); }); }
+document.getElementById("cw").addEventListener("input",applyCellSize);
+document.getElementById("ch").addEventListener("input",applyCellSize);
+document.getElementById("eq").addEventListener("click",applyCellSize);
+document.getElementById("add").addEventListener("click",()=>{ const [pw,ph]=cellPx();
+  const o={title:initFrac("title","PRODUCTO",pw,ph),sub:initFrac("sub","DESCRIPCIÓN",pw,ph),price:initFrac("price","000",pw,ph)};
+  const t=makeTag(o); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
+document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastElementChild; if(!b)return;
+  const g=r=>{const el=b.querySelector(".el."+r); return el?{fx:+el.dataset.fx,fy:+el.dataset.fy,fw:+el.dataset.fw,fh:+el.dataset.fh,font:el.dataset.font,txt:txOf(el)}:{fx:0,fy:0,fw:0,fh:0,txt:"",font:""};};
+  const t=makeTag({title:g("title"),sub:g("sub"),price:g("price")}); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
+document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Restablecer la lista original? Se pierden los cambios.")){ localStorage.removeItem(KEY); clearSel(); render(null); } });
+document.getElementById("print").addEventListener("click",()=>window.print());
+
+// ---- fuente / tamaño GLOBAL ----
+document.getElementById("fontAll").addEventListener("change",e=>{ const f=e.target.value; grid.querySelectorAll(".el").forEach(el=>{ el.dataset.font=f; el.querySelector(".inner").style.fontFamily=f; layoutEl(el); }); save(); });
+function scaleAll(k){ grid.querySelectorAll(".el").forEach(el=>{ el.dataset.fw=Math.max(0.03,el.dataset.fw*k); el.dataset.fh=Math.max(0.03,el.dataset.fh*k); layoutEl(el); }); save(); }
+document.getElementById("allPlus").addEventListener("click",()=>scaleAll(1.1));
+document.getElementById("allMinus").addEventListener("click",()=>scaleAll(0.9));
+
+// ---- fuente / tamaño SELECCIONADO ----
+document.getElementById("fontSel").addEventListener("change",e=>{ if(!selEl)return; selEl.dataset.font=e.target.value; selEl.querySelector(".inner").style.fontFamily=e.target.value; layoutEl(selEl); save(); });
+function selScale(kw,kh){ if(!selEl)return; selEl.dataset.fw=Math.max(0.03,selEl.dataset.fw*kw); selEl.dataset.fh=Math.max(0.03,selEl.dataset.fh*kh); layoutEl(selEl); save(); }
+document.getElementById("selPlus").addEventListener("click",()=>selScale(1.12,1.12));
+document.getElementById("selMinus").addEventListener("click",()=>selScale(0.89,0.89));
+document.getElementById("selWmore").addEventListener("click",()=>selScale(1.12,1));
+document.getElementById("selWless").addEventListener("click",()=>selScale(0.89,1));
+document.getElementById("selHmore").addEventListener("click",()=>selScale(1,1.12));
+document.getElementById("selHless").addEventListener("click",()=>selScale(1,0.89));
+
+document.addEventListener("mousedown",e=>{ if(!e.target.closest(".el")&&!e.target.closest("#selbar")&&!e.target.closest(".grp")&&!e.target.closest(".del")) clearSel(); });
+window.addEventListener("resize",()=>requestAnimationFrame(relayoutAll));
+window.addEventListener("beforeprint",relayoutAll);
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(relayoutAll);
+
+syncSel();
+render(load());
+</script>
+</body>
+</html>
