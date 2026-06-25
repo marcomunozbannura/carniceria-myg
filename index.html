@@ -45,6 +45,7 @@
   .appbar-actions{ display:flex; gap:8px; }
   .btn-help{ background:#2b6cb0 !important; }
   .btn-save{ background:#0f7b8a !important; }
+  .btn-new{ background:#6b54c8 !important; }
   /* boton + por cuadro */
   .addtx{ position:absolute; top:1px; left:1px; width:20px; height:20px; border-radius:50%; background:#1f9d57; color:#fff;
           border:none; font-size:15px; line-height:18px; cursor:pointer; display:none; padding:0; z-index:9; font-weight:700; }
@@ -145,6 +146,7 @@
     <span class="vsep"></span>
     <button class="btn-add" id="add">＋ Agregar</button>
     <button id="dup">⧉ Duplicar</button>
+    <button class="btn-new" id="newsheet" title="Empezar una hoja nueva y vacía (guarda antes con 💾 si no quieres perder la actual)">📄 Nueva (vacía)</button>
     <button id="reset">↺ Restablecer</button>
     <span class="vsep"></span>
     <button class="btn-save" id="savefile" title="Descarga un archivo con tus letreros para no perderlos y poder compartirlos">💾 Guardar archivo</button>
@@ -184,7 +186,8 @@
       <li><b>Fuente y color:</b> elige el texto y cambia <b>Fuente</b> y <b>Color</b> en la barra “Texto elegido”. Con <b>Todo el panel</b> cambias todos a la vez.</li>
       <li><b>Borrar un cuadro:</b> pasa el mouse y pulsa la <b style="color:#e8242b">✕</b> (arriba-derecha).</li>
       <li><b>Tamaño de los cuadros (para cortar):</b> ajusta <b>Ancho/Alto mm</b> y pulsa <b>▦ Igualar cuadros</b>. Agrega cuadros con <b>＋ Agregar</b> o <b>⧉ Duplicar</b>.</li>
-      <li><b>Imprimir / PDF:</b> pulsa <b>🖨 Imprimir / PDF</b> y en Destino elige tu impresora o “Guardar como PDF”. Los recuadros salen como líneas de corte.</li>
+      <li><b>Hoja nueva:</b> no hace falta “crear páginas”. Solo sigue agregando letreros con <b>＋ Agregar</b>: al imprimir <b>se reparten solos en varias hojas A4</b> (cada hoja es una lámina para cortar). Para empezar de cero (vacío) usa <b style="color:#6b54c8">📄 Nueva (vacía)</b> — guarda antes con 💾 si no quieres perder lo actual.</li>
+      <li><b>Imprimir / PDF:</b> pulsa <b>🖨 Imprimir / PDF</b> y en Destino elige tu impresora o “Guardar como PDF”. <b>Importante:</b> en el cuadro de impresión <b>DESMARCA “Cabeceras y pies de página”</b> (así no sale la fecha ni la dirección web). Que se divida en varias hojas es normal y correcto: son las láminas para cortar con la guillotina.</li>
       <li><b style="color:#b81d24">⚠️ Para NO perder tu trabajo:</b> pulsa <b>💾 Guardar archivo</b> y guarda el archivo en tu computador. Si cambias de equipo o se borra el navegador, ábrelo de nuevo con <b>📂 Abrir archivo</b>. También puedes mandarle ese archivo a tu socio.</li>
     </ol>
     <button class="btn-print" id="helpOk" onclick="document.getElementById('help').classList.remove('show')">Entendido</button>
@@ -363,6 +366,12 @@ document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastE
   const g=r=>{const el=b.querySelector(".el."+r); return el?{fx:+el.dataset.fx,fy:+el.dataset.fy,fw:+el.dataset.fw,fh:+el.dataset.fh,font:el.dataset.font,txt:txOf(el)}:{fx:0,fy:0,fw:0,fh:0,txt:"",font:""};};
   const t=makeTag({title:g("title"),sub:g("sub"),price:g("price")}); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
 document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Restablecer la lista original? Se pierden los cambios.")){ localStorage.removeItem(KEY); clearSel(); render(null); } });
+document.getElementById("newsheet").addEventListener("click",()=>{
+  if(!confirm("¿Crear una HOJA NUEVA y vacía?\n\nOJO: se quitan los letreros actuales. Si no quieres perderlos, pulsa antes 💾 Guardar archivo.")) return;
+  const [pw,ph]=cellPx();
+  const blank=()=>({title:initFrac("title","PRODUCTO",pw,ph),sub:initFrac("sub","DESCRIPCION",pw,ph),price:initFrac("price","000",pw,ph),extras:[]});
+  clearSel(); render([blank(),blank(),blank()]);
+});
 document.getElementById("print").addEventListener("click",()=>window.print());
 
 // ---- fuente / tamaño GLOBAL ----
