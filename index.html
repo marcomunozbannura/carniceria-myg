@@ -41,7 +41,23 @@
   button.swatch{ width:22px; height:22px; min-width:0; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #777; cursor:pointer; padding:0; }
   input[type=color]{ width:32px; height:28px; border:none; border-radius:7px; background:none; cursor:pointer; padding:0; }
   #selbar.off{ opacity:.45; pointer-events:none; }
-  .hint{ font-size:11px; opacity:.72; padding:4px 18px 10px; line-height:1.4; }
+  .hint{ font-size:11px; opacity:.78; padding:4px 18px 10px; line-height:1.45; }
+  .appbar-actions{ display:flex; gap:8px; }
+  .btn-help{ background:#2b6cb0 !important; }
+  .btn-save{ background:#0f7b8a !important; }
+  /* boton + por cuadro */
+  .addtx{ position:absolute; top:1px; left:1px; width:20px; height:20px; border-radius:50%; background:#1f9d57; color:#fff;
+          border:none; font-size:15px; line-height:18px; cursor:pointer; display:none; padding:0; z-index:9; font-weight:700; }
+  .tag:hover .addtx, .tag:has(.el.sel) .addtx{ display:block; }
+  /* modal ayuda */
+  .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; align-items:flex-start; justify-content:center; padding:30px 14px; overflow:auto; }
+  .modal.show{ display:flex; }
+  .modal-card{ background:#fff; color:#1a1a1a; max-width:640px; width:100%; border-radius:14px; padding:22px 24px 26px; position:relative; box-shadow:0 20px 60px rgba(0,0,0,.4); }
+  .modal-card h2{ margin:0 0 12px; font-size:20px; color:#b81d24; }
+  .modal-card ol{ margin:0; padding-left:22px; line-height:1.6; font-size:14px; }
+  .modal-card li{ margin-bottom:9px; }
+  .modal-x{ position:absolute; top:10px; right:12px; width:30px; height:30px; border-radius:50%; border:none; background:#eee; cursor:pointer; font-size:14px; }
+  #helpOk{ margin-top:16px; }
 
   /* ---------- GRILLA ---------- */
   .sheet-wrap{ padding:22px; display:flex; justify-content:center; }
@@ -115,7 +131,10 @@
       </svg>
       <div class="wm"><b>CARNICERÍA <span>MYG</span></b><small>Carnes · Cecinas · Abarrotes — Generador de letreros</small></div>
     </div>
-    <button class="btn-print" id="print">🖨 Imprimir / PDF</button>
+    <div class="appbar-actions">
+      <button class="btn-help" id="helpBtn">❓ Cómo usar</button>
+      <button class="btn-print" id="print">🖨 Imprimir / PDF</button>
+    </div>
   </div>
   <div class="barrow">
     <span class="seclbl">📐 Hoja</span>
@@ -127,6 +146,10 @@
     <button class="btn-add" id="add">＋ Agregar</button>
     <button id="dup">⧉ Duplicar</button>
     <button id="reset">↺ Restablecer</button>
+    <span class="vsep"></span>
+    <button class="btn-save" id="savefile" title="Descarga un archivo con tus letreros para no perderlos y poder compartirlos">💾 Guardar archivo</button>
+    <button id="openfile" title="Abre un archivo de letreros guardado antes">📂 Abrir archivo</button>
+    <input type="file" id="filein" accept=".json,application/json" style="display:none">
   </div>
   <div class="barrow">
     <div class="grp big"><span class="seclbl light">🌐 Todo el panel</span><label>Fuente</label><select id="fontAll"></select>
@@ -143,11 +166,30 @@
       <button class="swatch" data-c="#1f9d57" style="background:#1f9d57" title="Verde"></button>
       <button class="swatch" data-c="#1466c8" style="background:#1466c8" title="Azul"></button>
       <input type="color" id="colorSel" title="Otro color"></div>
-    <div class="hint">Clic en un texto para escribir o cambiarle la fuente. Cuando está elegido salen tiradores: ● lados = ancho/alto, ◣ esquina = ambos, ✥ arriba-izquierda = mover. También sirven los botones ↔ (ancho) y ↕ (alto).</div>
+    <div class="hint">Clic en un texto para escribir. Para <b>agregar una línea o un numerito</b> (ej. “1/4”): pasa el mouse sobre un cuadro y pulsa el <b style="color:#36d57f">＋</b> (arriba-izquierda); escríbelo y arrástralo donde quieras. Con un texto elegido salen tiradores: ● lados = ancho/alto · ◣ esquina = ambos · ✥ = mover. ¿Dudas? Pulsa <b>❓ Cómo usar</b>.</div>
   </div>
 </div>
 
 <div class="sheet-wrap"><div class="grid" id="grid"></div></div>
+
+<div class="modal" id="help">
+  <div class="modal-card">
+    <button class="modal-x" id="helpClose" title="Cerrar">✕</button>
+    <h2>🥩 Cómo usar — Carnicería MYG</h2>
+    <ol>
+      <li><b>Editar:</b> haz clic sobre cualquier palabra o número y escribe lo nuevo.</li>
+      <li><b>Agregar una línea o un numerito</b> (ej. una línea bajo “GALLETAS”, o “1/4” en una esquina): pasa el mouse sobre el cuadro y pulsa el botón <b style="color:#1f9d57">＋</b> (arriba a la izquierda del cuadro). Aparece un texto nuevo: escríbelo y <b>arrástralo</b> a donde quieras.</li>
+      <li><b>Mover:</b> haz clic en el texto y arrastra el círculo <b>✥</b> (arriba-izquierda).</li>
+      <li><b>Agrandar / achicar:</b> con el texto elegido, arrastra los tiradores: <b>●</b> de los lados = ancho o alto, <b>◣</b> de la esquina = los dos. También sirven los botones <b>A−/A＋</b>, <b>↔</b> (ancho) y <b>↕</b> (alto).</li>
+      <li><b>Fuente y color:</b> elige el texto y cambia <b>Fuente</b> y <b>Color</b> en la barra “Texto elegido”. Con <b>Todo el panel</b> cambias todos a la vez.</li>
+      <li><b>Borrar un cuadro:</b> pasa el mouse y pulsa la <b style="color:#e8242b">✕</b> (arriba-derecha).</li>
+      <li><b>Tamaño de los cuadros (para cortar):</b> ajusta <b>Ancho/Alto mm</b> y pulsa <b>▦ Igualar cuadros</b>. Agrega cuadros con <b>＋ Agregar</b> o <b>⧉ Duplicar</b>.</li>
+      <li><b>Imprimir / PDF:</b> pulsa <b>🖨 Imprimir / PDF</b> y en Destino elige tu impresora o “Guardar como PDF”. Los recuadros salen como líneas de corte.</li>
+      <li><b style="color:#b81d24">⚠️ Para NO perder tu trabajo:</b> pulsa <b>💾 Guardar archivo</b> y guarda el archivo en tu computador. Si cambias de equipo o se borra el navegador, ábrelo de nuevo con <b>📂 Abrir archivo</b>. También puedes mandarle ese archivo a tu socio.</li>
+    </ol>
+    <button class="btn-print" id="helpOk" onclick="document.getElementById('help').classList.remove('show')">Entendido</button>
+  </div>
+</div>
 
 <script>
 const FONTS=[
@@ -168,8 +210,8 @@ const DEFAULT=[
  ["AJI CREMA","DON JUAN","1.450"],["KETCHUP","DON JUAN","1.550"],["MOSTAZA","DON JUAN","1.580"]
 ];
 // posición/tamaño inicial por rol, en fracciones del cuadro {fx,fy,fw,fh}
-const ROLEY={title:0.05, sub:0.35, price:0.52};
-const ROLEH={title:0.26, sub:0.14, price:0.42};
+const ROLEY={title:0.05, sub:0.35, price:0.52, extra:0.40};
+const ROLEH={title:0.26, sub:0.14, price:0.42, extra:0.14};
 const KEY="letreros_carniceria_v4";
 const grid=document.getElementById("grid");
 let selEl=null;
@@ -178,15 +220,16 @@ function fillFont(sel){ sel.innerHTML=""; FONTS.forEach(f=>{const o=document.cre
 fillFont(document.getElementById("fontAll")); fillFont(document.getElementById("fontSel"));
 
 function load(){ try{const s=localStorage.getItem(KEY); if(s)return JSON.parse(s);}catch(e){} return null; }
-function save(){
-  const data=[...grid.querySelectorAll(".tag")].map(t=>{
-    const g=r=>{ const el=t.querySelector(".el."+r); if(!el)return null;
-      return {txt:txOf(el), font:el.dataset.font||"", color:el.querySelector(".inner").style.color||"",
-              fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh}; };
-    return { title:g("title"), sub:g("sub"), price:g("price") };
+function elData(el){ return {txt:txOf(el), font:el.dataset.font||"", color:el.querySelector(".inner").style.color||"",
+    fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh}; }
+function serialize(){
+  return [...grid.querySelectorAll(".tag")].map(t=>{
+    const g=r=>{ const el=t.querySelector(".el."+r); return el?elData(el):null; };
+    const extras=[...t.querySelectorAll(".el.extra")].map(elData);
+    return { title:g("title"), sub:g("sub"), price:g("price"), extras };
   });
-  try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){}
 }
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(serialize())); }catch(e){} }
 function txOf(el){ const n=el.querySelector(".num")||el.querySelector(".inner"); return n.textContent; }
 const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
 
@@ -246,14 +289,27 @@ function startDrag(e,el,act){
   e.target.addEventListener("pointermove",mv); e.target.addEventListener("pointerup",up);
 }
 
+function addExtra(tag, txt){
+  const [pw,ph]=cellPx();
+  const ex=initFrac("extra", txt||"TEXTO", pw, ph);
+  const el=makeEl("extra", ex);
+  tag.appendChild(el);
+  requestAnimationFrame(()=>{ layoutEl(el); selectEl(el); const ed=el.querySelector(".ed");
+    ed.focus(); try{ const r=document.createRange(); r.selectNodeContents(ed); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(_){ } });
+  save();
+  return el;
+}
 function makeTag(o){
   const tag=document.createElement("div"); tag.className="tag";
-  const del=document.createElement("button"); del.className="del"; del.textContent="✕";
+  const addb=document.createElement("button"); addb.className="addtx"; addb.textContent="＋"; addb.title="Agregar una línea o un texto (lo puedes mover)";
+  addb.addEventListener("click",()=>addExtra(tag));
+  const del=document.createElement("button"); del.className="del"; del.textContent="✕"; del.title="Borrar este cuadro";
   del.addEventListener("click",()=>{ tag.remove(); if(selEl&&!document.contains(selEl))clearSel(); save(); });
-  tag.appendChild(del);
+  tag.appendChild(addb); tag.appendChild(del);
   tag.appendChild(makeEl("title",o.title));
   if(o.sub && (o.sub.txt||"").trim().length) tag.appendChild(makeEl("sub",o.sub));
   tag.appendChild(makeEl("price",o.price));
+  (o.extras||[]).forEach(ex=> tag.appendChild(makeEl("extra",ex)));
   return tag;
 }
 
@@ -328,6 +384,18 @@ document.getElementById("selHless").addEventListener("click",()=>selScale(1,0.89
 function setSelColor(c){ if(!selEl)return; selEl.querySelector(".inner").style.color=c; save(); }
 document.getElementById("colorSel").addEventListener("input",e=>setSelColor(e.target.value));
 document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>setSelColor(b.dataset.c)));
+
+// ---- guardar / abrir archivo (respaldo + compartir) ----
+function download(name,text){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"application/json"})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
+document.getElementById("savefile").addEventListener("click",()=>download("letreros-myg.json", JSON.stringify(serialize())));
+document.getElementById("openfile").addEventListener("click",()=>document.getElementById("filein").click());
+document.getElementById("filein").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f)return;
+  const r=new FileReader(); r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!Array.isArray(d)) throw 0; clearSel(); render(d); }catch(err){ alert("No se pudo abrir el archivo (no es un archivo de letreros válido)."); } };
+  r.readAsText(f); e.target.value=""; });
+
+// ---- ayuda ----
+document.getElementById("helpBtn").addEventListener("click",()=>document.getElementById("help").classList.add("show"));
+document.getElementById("help").addEventListener("click",e=>{ if(e.target.id==="help"||e.target.id==="helpClose") document.getElementById("help").classList.remove("show"); });
 
 document.addEventListener("mousedown",e=>{ if(!e.target.closest(".el")&&!e.target.closest("#selbar")&&!e.target.closest(".grp")&&!e.target.closest(".del")) clearSel(); });
 window.addEventListener("resize",()=>requestAnimationFrame(relayoutAll));
