@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Oswald:wght@700&family=Bebas+Neue&family=Teko:wght@700&family=Fjalla+One&family=Passion+One:wght@700;900&family=Bungee&family=Russo+One&family=Alfa+Slab+One&family=Luckiest+Guy&family=Staatliches&family=Righteous&family=Bowlby+One+SC&family=Pacifico&family=Lobster&family=Permanent+Marker&family=Rubik+Mono+One&family=Black+Ops+One&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style id="pagestyle">@page{ size:A4 portrait; margin:4mm; }</style>
 <style>
   :root{ --cw:90mm; --ch:65mm; --cols:2; --bw:1.2pt; }
@@ -22,7 +23,9 @@
   .brand .wm b{ font-size:19px; letter-spacing:.4px; }
   .brand .wm b span{ color:#ff5a5f; }
   .brand .wm small{ font-size:11px; opacity:.72; margin-top:2px; }
-  .appbar-actions{ display:flex; gap:8px; }
+  .appbar-actions{ display:flex; gap:8px; align-items:center; }
+  .cloud{ font-size:12px; font-weight:700; padding:5px 9px; border-radius:7px; background:#2b3242; white-space:nowrap; }
+  .cloud.ok{ color:#36d57f; } .cloud.saving{ color:#ffd24a; } .cloud.err{ color:#ff7a7a; }
   .typebar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:9px 18px; background:#1d222a; border-bottom:1px solid #333a45; }
   .typebtn{ border:1px solid #3c434e; background:#2c333d; color:#fff; border-radius:20px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer; }
   .typebtn:hover{ filter:brightness(1.15); }
@@ -125,6 +128,7 @@
       <div class="wm"><b>CARNICERÍA <span>MYG</span></b><small>Carnes · Cecinas · Abarrotes — Generador de letreros</small></div>
     </div>
     <div class="appbar-actions">
+      <span id="cloud" class="cloud" title="Guardado en la nube">☁️ …</span>
       <button class="btn-help" id="helpBtn">❓ Cómo usar</button>
       <button class="btn-print" id="print">🖨 Imprimir / PDF</button>
     </div>
@@ -249,6 +253,14 @@ const SEED={
 const grid=document.getElementById("grid");
 const cwEl=document.getElementById("cw"), chEl=document.getElementById("ch"), colsEl=document.getElementById("cols");
 const pagestyle=document.getElementById("pagestyle");
+// ---- nube (Supabase) ----
+const SB_URL="https://pikbmocrnlosoujjllmw.supabase.co";
+const SB_KEY="sb_publishable_t69jY2QTrEF8TCz9b_X4oQ_j8lS-PN_";
+const sb = (window.supabase && window.supabase.createClient) ? window.supabase.createClient(SB_URL,SB_KEY) : null;
+function setCloud(txt,cls){ const el=document.getElementById("cloud"); if(!el)return; el.className="cloud "+(cls||""); el.textContent=txt; }
+async function cloudLoad(t){ if(!sb) return undefined; try{ const {data,error}=await sb.from("letreros_myg").select("data").eq("tipo",t).maybeSingle(); if(error) throw error; return data ? data.data : null; }catch(e){ return undefined; } }
+async function cloudSave(t,arr){ if(!sb){ setCloud("💾 Solo local","err"); return; } try{ const {error}=await sb.from("letreros_myg").upsert({tipo:t,data:arr,updated_at:new Date().toISOString()}); if(error) throw error; setCloud("☁️ Guardado","ok"); }catch(e){ setCloud("⚠️ Sin conexión","err"); } }
+const cloudSaveDeb=(()=>{let id;return()=>{ setCloud("☁️ Guardando…","saving"); clearTimeout(id); id=setTimeout(()=>cloudSave(TYPE, serialize()),700); };})();
 const SKEY="letreros_myg_type";
 let TYPE=localStorage.getItem(SKEY)||"abarrotes1";
 let selEl=null;
@@ -273,7 +285,7 @@ function serialize(){
     return { title:g("title"), sub:g("sub"), price:g("price"), money:g("money"), extras };
   });
 }
-function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} }
+function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} cloudSaveDeb(); }
 function saveSet(){ try{ localStorage.setItem(setKeyName(TYPE), JSON.stringify({cw:cwEl.value,ch:chEl.value,cols:colsEl.value})); }catch(e){} }
 const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
 
@@ -405,7 +417,7 @@ function applyVars(){
     "@media print{ html,body{ width:"+W+"mm; min-width:"+W+"mm; margin:0; padding:0; } "+
     ".sheet-wrap{ width:"+W+"mm; padding:0; margin:0; justify-content:center; } }";
 }
-function setType(t){
+async function setType(t){
   TYPE=t; localStorage.setItem(SKEY,t);
   const cfg=TYPES[t]; const st=loadSet(t)||{cw:cfg.wmm/10, ch:cfg.hmm/10, cols:cfg.cols};
   cwEl.value=st.cw; chEl.value=st.ch; colsEl.value=st.cols;
@@ -413,7 +425,13 @@ function setType(t){
   document.querySelectorAll(".typebtn").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
   document.getElementById("typeinfo").textContent="· "+cfg.wmm/10+"×"+cfg.hmm/10+" cm · "+cfg.cols+" col · "+(cfg.orient==="landscape"?"hoja horizontal":"hoja vertical")+" · sugerido "+cfg.cols+"×"+cfg.fil;
   clearSel(); history=[];
-  render(loadType(t)||seedDefault(t));
+  setCloud("☁️ Cargando…","saving");
+  let data = await cloudLoad(t);                 // array=hay datos · null=no hay fila · undefined=error
+  if(data===undefined){ setCloud("⚠️ Sin conexión","err"); data = loadType(t); }
+  else if(data===null){ data = loadType(t) || seedDefault(t); }   // 1ra vez: sube lo local/ejemplos a la nube via save()
+  else { setCloud("☁️ Guardado","ok"); }
+  if(t!==TYPE) return;                            // si cambió de tipo mientras cargaba, abortar
+  render(data);
 }
 
 // ---- controles hoja ----
