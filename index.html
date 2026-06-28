@@ -42,7 +42,7 @@
   .toolbar button:hover{ filter:brightness(1.16); } .toolbar button:active{ transform:translateY(1px); }
   .btn-print{ background:#c0121f !important; box-shadow:0 2px 10px rgba(192,18,31,.45); font-size:14px; }
   .btn-add{ background:#1f9d57 !important; } .btn-eq{ background:#c98a00 !important; }
-  .btn-help{ background:#2b6cb0 !important; } .btn-save{ background:#0f7b8a !important; } .btn-new{ background:#6b54c8 !important; }
+  .btn-help{ background:#2b6cb0 !important; } .btn-save{ background:#0f7b8a !important; } .btn-new{ background:#6b54c8 !important; } .btn-undo{ background:#7a8699 !important; }
   .mini{ padding:6px 9px !important; font-size:13px !important; background:#4a5566 !important; }
   button.swatch{ width:22px; height:22px; min-width:0; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #777; cursor:pointer; padding:0; }
   input[type=color]{ width:32px; height:28px; border:none; border-radius:7px; background:none; cursor:pointer; padding:0; }
@@ -57,8 +57,7 @@
   .el{ position:absolute; }
   .inner{ position:absolute; left:0; top:0; font-size:100px; line-height:1; white-space:nowrap; font-family:"Hiragino Kaku Gothic Std","Arial Black",Arial,sans-serif; font-weight:800; letter-spacing:-1px; transform-origin:top left; outline:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .el.title .inner{ color:#000; } .el.sub .inner{ color:#000; } .el.cat .inner{ color:#000; } .el.extra .inner{ color:#000; }
-  .el.price .inner{ color:#e30613; }
-  .el.price .cur{ font-size:.5em; vertical-align:.35em; }
+  .el.price .inner, .el.money .inner{ color:#e30613; }
   .inner:focus{ background:#fff7cc; }
   .el.sel{ outline:1.5px dashed #2b7cff; }
 
@@ -133,8 +132,8 @@
 
   <div class="typebar">
     <span class="seclbl">Tipo de letrero</span>
-    <button class="typebtn" data-type="abarrotes1">Abarrotes (nombre arriba)</button>
-    <button class="typebtn" data-type="abarrotes2">Abarrotes (nombre abajo)</button>
+    <button class="typebtn" data-type="abarrotes1">Abarrotes grande</button>
+    <button class="typebtn" data-type="abarrotes2">Abarrotes chico</button>
     <button class="typebtn" data-type="cecinas">Cecinas</button>
     <button class="typebtn" data-type="carnes">Carnes</button>
     <button class="typebtn" data-type="ofertas">Ofertas</button>
@@ -150,6 +149,7 @@
     <span class="vsep"></span>
     <button class="btn-add" id="add">＋ Agregar</button>
     <button id="dup">⧉ Duplicar</button>
+    <button class="btn-undo" id="undo" title="Deshacer lo último que hiciste">↶ Deshacer</button>
     <button class="btn-new" id="newsheet" title="Hoja nueva y vacía (de este tipo)">📄 Nueva (vacía)</button>
     <button id="reset">↺ Restablecer</button>
     <span class="vsep"></span>
@@ -172,7 +172,8 @@
       <button class="swatch" data-c="#FFD400" style="background:#FFD400" title="Amarillo"></button>
       <button class="swatch" data-c="#1f9d57" style="background:#1f9d57" title="Verde"></button>
       <button class="swatch" data-c="#1466c8" style="background:#1466c8" title="Azul"></button>
-      <input type="color" id="colorSel" title="Otro color"></div>
+      <input type="color" id="colorSel" title="Otro color">
+      <button class="mini" id="delsel" title="Borrar el cuadro de texto elegido" style="background:#e8242b !important">🗑 Borrar texto</button></div>
   </div>
   <div class="hint">Elige el <b>Tipo</b> arriba (ajusta tamaño, columnas y orientación solo). Clic en un texto para escribir. Para una línea/numerito extra (ej. “1/4”): pasa el mouse sobre un cuadro y pulsa el <b style="color:#36d57f">＋</b>. Tiradores: ● lados · ◣ esquina · ✥ mover. ¿Dudas? <b>❓ Cómo usar</b>.</div>
 </div>
@@ -251,6 +252,10 @@ const pagestyle=document.getElementById("pagestyle");
 const SKEY="letreros_myg_type";
 let TYPE=localStorage.getItem(SKEY)||"abarrotes1";
 let selEl=null;
+let history=[], beforeEdit=null, editPushed=false;
+function snapshot(){ return JSON.stringify(serialize()); }
+function pushHistory(){ try{ history.push(snapshot()); if(history.length>80) history.shift(); }catch(e){} }
+function undo(){ if(!history.length) return; const s=history.pop(); clearSel(); render(JSON.parse(s)); }
 
 function fillFont(sel){ sel.innerHTML=""; FONTS.forEach(f=>{const o=document.createElement("option");o.value=f;o.textContent=f;o.style.fontFamily=f;sel.appendChild(o);}); }
 fillFont(document.getElementById("fontAll")); fillFont(document.getElementById("fontSel"));
@@ -259,13 +264,13 @@ function dataKey(t){return "letreros_myg_data_"+t;}
 function setKeyName(t){return "letreros_myg_set_"+t;}
 function loadType(t){ try{const s=localStorage.getItem(dataKey(t)); if(s)return JSON.parse(s);}catch(e){} return null; }
 function loadSet(t){ try{const s=localStorage.getItem(setKeyName(t)); if(s)return JSON.parse(s);}catch(e){} return null; }
-function txOf(el){ const n=el.querySelector(".num")||el.querySelector(".inner"); return n.textContent; }
+function txOf(el){ return el.querySelector(".inner").textContent; }
 function elData(el){ return {txt:txOf(el), font:el.dataset.font||"", color:el.querySelector(".inner").style.color||"", fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh}; }
 function serialize(){
   return [...grid.querySelectorAll(".tag")].map(t=>{
     const g=r=>{ const el=t.querySelector(".el."+r); return el?elData(el):null; };
     const extras=[...t.querySelectorAll(".el.extra")].map(elData);
-    return { cat:g("cat"), title:g("title"), sub:g("sub"), price:g("price"), extras };
+    return { title:g("title"), sub:g("sub"), price:g("price"), money:g("money"), extras };
   });
 }
 function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} }
@@ -292,22 +297,21 @@ function clearTagInline(){ grid.querySelectorAll(".tag").forEach(t=>{ t.style.wi
 function makeEl(role,o){
   const el=document.createElement("div"); el.className="el "+role;
   el.dataset.fx=o.fx; el.dataset.fy=o.fy; el.dataset.fw=o.fw; el.dataset.fh=o.fh; el.dataset.font=o.font||"";
-  const inner=document.createElement("div"); inner.className="inner";
+  const inner=document.createElement("div"); inner.className="inner"; inner.setAttribute("contenteditable","true");
   if(o.font) inner.style.fontFamily=fontCss(o.font);
   if(o.color) inner.style.color=o.color;
-  if(role==="price"){ inner.innerHTML='<span class="cur">$</span><span class="num" contenteditable="true"></span>'; inner.querySelector(".num").textContent=o.txt; }
-  else { inner.setAttribute("contenteditable","true"); inner.textContent=o.txt; }
+  inner.textContent=o.txt;
   el.appendChild(inner);
   ["move","e","s","se"].forEach(a=>{ const h=document.createElement("div"); h.className="h "+a; h.dataset.act=a; el.appendChild(h); });
-  const editable = inner.querySelector(".num")||inner;
-  editable.addEventListener("input",()=>{ layoutEl(el); debSave(); });
-  editable.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); editable.blur();} });
+  inner.addEventListener("focus",()=>{ beforeEdit=snapshot(); editPushed=false; });
+  inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } layoutEl(el); debSave(); });
+  inner.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); inner.blur();} });
   el.addEventListener("mousedown",e=>{ if(e.target.classList.contains("h"))return; selectEl(el); });
   el.querySelectorAll(".h").forEach(h=>h.addEventListener("pointerdown",e=>startDrag(e,el,h.dataset.act)));
   return el;
 }
 function startDrag(e,el,act){
-  e.preventDefault(); e.stopPropagation(); selectEl(el);
+  e.preventDefault(); e.stopPropagation(); selectEl(el); pushHistory();
   const tag=el.closest(".tag"), cw=tag.clientWidth, ch=tag.clientHeight;
   const sx=e.clientX, sy=e.clientY;
   const fx=+el.dataset.fx, fy=+el.dataset.fy, fw=+el.dataset.fw, fh=+el.dataset.fh;
@@ -327,30 +331,32 @@ function startDrag(e,el,act){
 function mkFrac(role,txt,pw,ph,fy,fh,font){
   const m=document.createElement("div"); m.className="inner"; m.style.position="absolute"; m.style.visibility="hidden"; m.style.fontSize="100px";
   if(font) m.style.fontFamily=fontCss(font);
-  if(role==="price"){ m.innerHTML='<span style="font-size:.5em;vertical-align:.35em">$</span><span></span>'; m.lastChild.textContent=txt; }
-  else m.textContent=txt;
+  m.textContent=txt;
   grid.appendChild(m); const nw=m.offsetWidth||1, nh=m.offsetHeight||1; m.remove();
   const aspect=nw/nh; let fw=(fh*ph*aspect)/pw; if(fw>0.94){ fw=0.94; fh=(fw*pw/aspect)/ph; }
   return {txt, font:font||"", color:"", fx:(1-fw)/2, fy, fw, fh};
 }
-function layoutFor(catPos){
-  return catPos==="bottom"
-    ? {title:[0.05,0.25], sub:[0.33,0.11], price:[0.45,0.36], cat:[0.83,0.14]}
-    : {cat:[0.05,0.16], title:[0.25,0.22], sub:[0.49,0.11], price:[0.61,0.33]};
+// "$" como cuadro de texto aparte, a la izquierda del número
+function mkMoney(price,pw,ph){
+  const m=mkFrac("money","$",pw,ph, price.fy, Math.max(0.05, price.fh*0.55), CALI);
+  m.color="#e30613";
+  m.fx=Math.max(0.005, price.fx - m.fw - 0.005);
+  m.fy=price.fy;
+  return m;
 }
 function seedTag(cfg,prod){
-  const [pw,ph]=cellPx(); const L=layoutFor(cfg.catPos);
-  return {
-    cat:   mkFrac("cat",   cfg.cat, pw,ph, L.cat[0],   L.cat[1],   HIRA),
-    title: mkFrac("title", prod[0], pw,ph, L.title[0], L.title[1], HIRA),
-    sub:   prod[1]? mkFrac("sub", prod[1], pw,ph, L.sub[0], L.sub[1], HIRA) : null,
-    price: mkFrac("price", prod[2], pw,ph, L.price[0], L.price[1], CALI),
-    extras:[]
-  };
+  const [pw,ph]=cellPx();
+  const L={title:[0.07,0.30], sub:[0.42,0.14], price:[0.57,0.40]};
+  const title=mkFrac("title",prod[0],pw,ph,L.title[0],L.title[1],HIRA);
+  const sub=prod[1]? mkFrac("sub",prod[1],pw,ph,L.sub[0],L.sub[1],HIRA):null;
+  const price=mkFrac("price",prod[2],pw,ph,L.price[0],L.price[1],CALI);
+  const money=mkMoney(price,pw,ph);
+  return { title, sub, price, money, extras:[] };
 }
 function seedDefault(t){ const cfg=TYPES[t]; return SEED[t].map(p=>seedTag(cfg,p)); }
 
 function addExtra(tag){
+  pushHistory();
   const [pw,ph]=cellPx();
   const ex=mkFrac("extra","TEXTO",pw,ph,0.42,0.14,HIRA);
   const el=makeEl("extra",ex); tag.appendChild(el);
@@ -362,13 +368,16 @@ function makeTag(o){
   const tag=document.createElement("div"); tag.className="tag";
   const addb=document.createElement("button"); addb.className="addtx"; addb.textContent="＋"; addb.title="Agregar una línea o un texto (lo puedes mover)";
   addb.addEventListener("click",()=>addExtra(tag));
-  const del=document.createElement("button"); del.className="del"; del.textContent="✕"; del.title="Borrar este cuadro";
-  del.addEventListener("click",()=>{ tag.remove(); if(selEl&&!document.contains(selEl))clearSel(); save(); });
+  const del=document.createElement("button"); del.className="del"; del.textContent="✕"; del.title="Borrar este cuadro completo";
+  del.addEventListener("click",()=>{ pushHistory(); tag.remove(); if(selEl&&!document.contains(selEl))clearSel(); save(); });
   tag.appendChild(addb); tag.appendChild(del);
-  if(o.cat && (o.cat.txt||"").trim().length) tag.appendChild(makeEl("cat",o.cat));
-  tag.appendChild(makeEl("title",o.title));
+  if(o.title) tag.appendChild(makeEl("title",o.title));
   if(o.sub && (o.sub.txt||"").trim().length) tag.appendChild(makeEl("sub",o.sub));
-  tag.appendChild(makeEl("price",o.price));
+  if(o.price){
+    tag.appendChild(makeEl("price",o.price));
+    const money = o.money || (function(){ const [pw,ph]=cellPx(); return mkMoney(o.price,pw,ph); })(); // migra datos viejos sin "$"
+    if(money && (money.txt||"").trim().length) tag.appendChild(makeEl("money",money));
+  }
   (o.extras||[]).forEach(ex=> tag.appendChild(makeEl("extra",ex)));
   return tag;
 }
@@ -403,7 +412,7 @@ function setType(t){
   applyVars();
   document.querySelectorAll(".typebtn").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
   document.getElementById("typeinfo").textContent="· "+cfg.wmm/10+"×"+cfg.hmm/10+" cm · "+cfg.cols+" col · "+(cfg.orient==="landscape"?"hoja horizontal":"hoja vertical")+" · sugerido "+cfg.cols+"×"+cfg.fil;
-  clearSel();
+  clearSel(); history=[];
   render(loadType(t)||seedDefault(t));
 }
 
@@ -413,35 +422,37 @@ function applyCellSize(){ clearTagInline(); applyVars();
 cwEl.addEventListener("input",applyCellSize);
 chEl.addEventListener("input",applyCellSize);
 colsEl.addEventListener("input",applyCellSize);
-document.getElementById("eq").addEventListener("click",applyCellSize);
-document.getElementById("add").addEventListener("click",()=>{ const t=makeTag(seedTag(TYPES[TYPE],["PRODUCTO","",  "000"])); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
-document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastElementChild; if(!b)return;
+document.getElementById("eq").addEventListener("click",()=>{ pushHistory(); applyCellSize(); });
+document.getElementById("add").addEventListener("click",()=>{ pushHistory(); const t=makeTag(seedTag(TYPES[TYPE],["PRODUCTO","","000"])); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
+document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastElementChild; if(!b)return; pushHistory();
   const g=r=>{const el=b.querySelector(".el."+r); return el?elData(el):null;};
   const exs=[...b.querySelectorAll(".el.extra")].map(elData);
-  const t=makeTag({cat:g("cat"),title:g("title"),sub:g("sub"),price:g("price"),extras:exs}); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
+  const t=makeTag({title:g("title"),sub:g("sub"),price:g("price"),money:g("money"),extras:exs}); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
+document.getElementById("undo").addEventListener("click",undo);
 document.getElementById("newsheet").addEventListener("click",()=>{ if(!confirm("¿Hoja NUEVA y vacía de este tipo?\n\nGuarda antes con 💾 si no quieres perder lo actual.")) return;
-  const blank=()=>seedTag(TYPES[TYPE],["PRODUCTO","","000"]); clearSel(); render([blank(),blank(),blank()]); });
-document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Volver a los ejemplos de este tipo? Se pierden los cambios.")){ localStorage.removeItem(dataKey(TYPE)); clearSel(); render(seedDefault(TYPE)); } });
+  pushHistory(); const blank=()=>seedTag(TYPES[TYPE],["PRODUCTO","","000"]); clearSel(); render([blank(),blank(),blank()]); });
+document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Volver a los ejemplos de este tipo? Se pierden los cambios.")){ pushHistory(); localStorage.removeItem(dataKey(TYPE)); clearSel(); render(seedDefault(TYPE)); } });
 document.getElementById("print").addEventListener("click",()=>window.print());
 
 // ---- fuente / tamaño global ----
-document.getElementById("fontAll").addEventListener("change",e=>{ const f=e.target.value; grid.querySelectorAll(".el").forEach(el=>{ el.dataset.font=f; el.querySelector(".inner").style.fontFamily=fontCss(f); layoutEl(el); }); save(); });
-function scaleAll(k){ grid.querySelectorAll(".el").forEach(el=>{ el.dataset.fw=Math.max(0.03,el.dataset.fw*k); el.dataset.fh=Math.max(0.03,el.dataset.fh*k); layoutEl(el); }); save(); }
+document.getElementById("fontAll").addEventListener("change",e=>{ pushHistory(); const f=e.target.value; grid.querySelectorAll(".el").forEach(el=>{ el.dataset.font=f; el.querySelector(".inner").style.fontFamily=fontCss(f); layoutEl(el); }); save(); });
+function scaleAll(k){ pushHistory(); grid.querySelectorAll(".el").forEach(el=>{ el.dataset.fw=Math.max(0.03,el.dataset.fw*k); el.dataset.fh=Math.max(0.03,el.dataset.fh*k); layoutEl(el); }); save(); }
 document.getElementById("allPlus").addEventListener("click",()=>scaleAll(1.1));
 document.getElementById("allMinus").addEventListener("click",()=>scaleAll(0.9));
 
 // ---- fuente / tamaño / color del seleccionado ----
-document.getElementById("fontSel").addEventListener("change",e=>{ if(!selEl)return; selEl.dataset.font=e.target.value; selEl.querySelector(".inner").style.fontFamily=fontCss(e.target.value); layoutEl(selEl); save(); });
-function selScale(kw,kh){ if(!selEl)return; selEl.dataset.fw=Math.max(0.03,selEl.dataset.fw*kw); selEl.dataset.fh=Math.max(0.03,selEl.dataset.fh*kh); layoutEl(selEl); save(); }
+document.getElementById("fontSel").addEventListener("change",e=>{ if(!selEl)return; pushHistory(); selEl.dataset.font=e.target.value; selEl.querySelector(".inner").style.fontFamily=fontCss(e.target.value); layoutEl(selEl); save(); });
+function selScale(kw,kh){ if(!selEl)return; pushHistory(); selEl.dataset.fw=Math.max(0.03,selEl.dataset.fw*kw); selEl.dataset.fh=Math.max(0.03,selEl.dataset.fh*kh); layoutEl(selEl); save(); }
 document.getElementById("selPlus").addEventListener("click",()=>selScale(1.12,1.12));
 document.getElementById("selMinus").addEventListener("click",()=>selScale(0.89,0.89));
 document.getElementById("selWmore").addEventListener("click",()=>selScale(1.12,1));
 document.getElementById("selWless").addEventListener("click",()=>selScale(0.89,1));
 document.getElementById("selHmore").addEventListener("click",()=>selScale(1,1.12));
 document.getElementById("selHless").addEventListener("click",()=>selScale(1,0.89));
-function setSelColor(c){ if(!selEl)return; selEl.querySelector(".inner").style.color=c; save(); }
+function setSelColor(c){ if(!selEl)return; pushHistory(); selEl.querySelector(".inner").style.color=c; save(); }
 document.getElementById("colorSel").addEventListener("input",e=>setSelColor(e.target.value));
 document.querySelectorAll(".swatch").forEach(b=>b.addEventListener("click",()=>setSelColor(b.dataset.c)));
+document.getElementById("delsel").addEventListener("click",()=>{ if(!selEl)return; pushHistory(); selEl.remove(); clearSel(); save(); });
 
 // ---- guardar / abrir ----
 function download(name,text){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"application/json"})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1500); }
