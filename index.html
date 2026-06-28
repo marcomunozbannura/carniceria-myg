@@ -73,8 +73,9 @@
 
   .h{ position:absolute; display:none; z-index:8; touch-action:none; background:transparent; }
   .h.e::before,.h.w::before,.h.s::before,.h.n::before{ content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:#2b7cff; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.45); border-radius:50%; width:14px; height:14px; }
-  .h.move{ left:-16px; top:-16px; width:30px; height:30px; cursor:move; }
-  .h.move::before{ content:"✥"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:#ff7a00; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.45); color:#fff; font:700 13px/1 Arial; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
+  .h.move,.h.moveR{ top:-16px; width:30px; height:30px; cursor:move; }
+  .h.move{ left:-16px; } .h.moveR{ right:-16px; }
+  .h.move::before,.h.moveR::before{ content:"✥"; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); background:#ff7a00; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.45); color:#fff; font:700 13px/1 Arial; border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
   .h.e{ right:-13px; top:calc(50% - 13px); width:26px; height:26px; cursor:ew-resize; }
   .h.w{ left:-13px; top:calc(50% - 13px); width:26px; height:26px; cursor:ew-resize; }
   .h.s{ left:calc(50% - 13px); bottom:-13px; width:26px; height:26px; cursor:ns-resize; }
@@ -323,7 +324,7 @@ function makeEl(role,o){
   if(o.color) inner.style.color=o.color;
   inner.textContent=o.txt;
   el.appendChild(inner);
-  ["move","n","s","e","w"].forEach(a=>{ const h=document.createElement("div"); h.className="h "+a; h.dataset.act=a; el.appendChild(h); });
+  [["move","move"],["moveR","move"],["n","n"],["s","s"],["e","e"],["w","w"]].forEach(p=>{ const h=document.createElement("div"); h.className="h "+p[0]; h.dataset.act=p[1]; el.appendChild(h); });
   inner.addEventListener("focus",()=>{ beforeEdit=snapshot(); editPushed=false; });
   inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } layoutEl(el); debSave(); });
   inner.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); inner.blur();} });
