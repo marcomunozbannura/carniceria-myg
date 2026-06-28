@@ -55,7 +55,7 @@
   .tag{ width:var(--cw); height:var(--ch); border:var(--bw) solid #000; margin:-0.6pt 0 0 -0.6pt; background:#fff; position:relative; overflow:hidden; }
 
   .el{ position:absolute; }
-  .inner{ position:absolute; left:0; top:0; font-size:100px; line-height:1; white-space:nowrap; font-family:"Hiragino Kaku Gothic Std","Arial Black",Arial,sans-serif; font-weight:800; letter-spacing:-1px; transform-origin:top left; outline:none; }
+  .inner{ position:absolute; left:0; top:0; font-size:100px; line-height:1; white-space:nowrap; font-family:"Hiragino Kaku Gothic Std","Arial Black",Arial,sans-serif; font-weight:800; letter-spacing:-1px; transform-origin:top left; outline:none; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .el.title .inner{ color:#000; } .el.sub .inner{ color:#000; } .el.cat .inner{ color:#000; } .el.extra .inner{ color:#000; }
   .el.price .inner{ color:#e30613; }
   .el.price .cur{ font-size:.5em; vertical-align:.35em; }
@@ -388,7 +388,13 @@ function applyVars(){
   document.documentElement.style.setProperty("--cw",(cwEl.value||9)+"cm");
   document.documentElement.style.setProperty("--ch",(chEl.value||6.5)+"cm");
   document.documentElement.style.setProperty("--cols",colsEl.value||2);
-  pagestyle.textContent="@page{ size:A4 "+TYPES[TYPE].orient+"; margin:4mm; }";
+  const orient=TYPES[TYPE].orient;
+  const W = orient==="landscape" ? 297 : 210;   // ancho real A4 en mm segun orientacion
+  // margen 0 + ancho de hoja fijo => Safari/Chrome NO encogen el contenido al imprimir
+  pagestyle.textContent =
+    "@page{ size:A4 "+orient+"; margin:0; }"+
+    "@media print{ html,body{ width:"+W+"mm; min-width:"+W+"mm; margin:0; padding:0; } "+
+    ".sheet-wrap{ width:"+W+"mm; padding:0; margin:0; justify-content:center; } }";
 }
 function setType(t){
   TYPE=t; localStorage.setItem(SKEY,t);
