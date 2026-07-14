@@ -298,7 +298,7 @@ function setKeyName(t){return "letreros_myg_set_"+t;}
 function loadType(t){ try{const s=localStorage.getItem(dataKey(t)); if(s)return JSON.parse(s);}catch(e){} return null; }
 function loadSet(t){ try{const s=localStorage.getItem(setKeyName(t)); if(s)return JSON.parse(s);}catch(e){} return null; }
 function txOf(el){ return el.querySelector(".inner").textContent; }
-function elData(el){ return {txt:txOf(el), font:el.dataset.font||"", color:el.querySelector(".inner").style.color||"", fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh}; }
+function elData(el){ return {txt:txOf(el), font:el.dataset.font||"", color:el.querySelector(".inner").style.color||"", fx:+el.dataset.fx, fy:+el.dataset.fy, fw:+el.dataset.fw, fh:+el.dataset.fh, sx:+el.dataset.sx||0, sy:+el.dataset.sy||0}; }
 function serialize(){
   return [...grid.querySelectorAll(".tag")].map(t=>{
     const g=r=>{ const el=t.querySelector(".el."+r); return el?elData(el):null; };
@@ -310,16 +310,20 @@ function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(seriali
 function saveSet(){ try{ localStorage.setItem(setKeyName(TYPE), JSON.stringify({cw:cwEl.value,ch:chEl.value,cols:colsEl.value,orient:curOrient})); }catch(e){} }
 const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
 
-function layoutEl(el){
-  const tag=el.closest(".tag"); if(!tag)return; const cw=tag.clientWidth, ch=tag.clientHeight;
-  const W=el.dataset.fw*cw, H=el.dataset.fh*ch;
+function boxPx(el){ const tag=el.closest(".tag"); if(!tag)return null; const cw=tag.clientWidth, ch=tag.clientHeight;
   el.style.left=(el.dataset.fx*cw)+"px"; el.style.top=(el.dataset.fy*ch)+"px";
-  el.style.width=W+"px"; el.style.height=H+"px";
-  const inner=el.querySelector(".inner");
+  el.style.width=(el.dataset.fw*cw)+"px"; el.style.height=(el.dataset.fh*ch)+"px";
+  return {W:el.dataset.fw*cw, H:el.dataset.fh*ch}; }
+// AJUSTAR: recalcula el estiramiento para LLENAR la caja (ancho y alto por separado, como estirar una foto) y lo GUARDA.
+function fitEl(el){ const b=boxPx(el); if(!b)return; const inner=el.querySelector(".inner");
   const nw=inner.offsetWidth||1, nh=inner.offsetHeight||1;
-  const s=Math.min(W/nw, H/nh);                 // escala uniforme: no distorsiona ni reordena al editar
-  inner.style.transform="translate("+((W-nw*s)/2)+"px,"+((H-nh*s)/2)+"px) scale("+s+")"; // texto centrado en su caja
-}
+  const sx=b.W/nw, sy=b.H/nh; el.dataset.sx=sx; el.dataset.sy=sy;
+  inner.style.transform="scale("+sx+","+sy+")"; }
+// COLOCAR: reposiciona la caja usando el estiramiento YA guardado. NO recalcula => al editar el texto las letras NO cambian de tamaño ni de lugar.
+function placeEl(el){ const b=boxPx(el); if(!b)return; const inner=el.querySelector(".inner");
+  const sx=+el.dataset.sx||1, sy=+el.dataset.sy||1;
+  inner.style.transform="scale("+sx+","+sy+")"; }
+function layoutEl(el){ if(el.dataset.sx) placeEl(el); else fitEl(el); }
 function relayoutAll(){ grid.querySelectorAll(".el").forEach(layoutEl); }
 function cellPx(){ const t=grid.querySelector(".tag"); if(t&&t.clientWidth&&t.clientHeight) return [t.clientWidth,t.clientHeight];
   const p=document.createElement("div"); p.className="tag"; p.style.visibility="hidden"; grid.appendChild(p); const w=p.clientWidth||340,h=p.clientHeight||245; p.remove(); return [w,h]; }
@@ -331,14 +335,16 @@ function clearTagInline(){ grid.querySelectorAll(".tag").forEach(t=>{ t.style.wi
 function makeEl(role,o){
   const el=document.createElement("div"); el.className="el "+role;
   el.dataset.fx=o.fx; el.dataset.fy=o.fy; el.dataset.fw=o.fw; el.dataset.fh=o.fh; el.dataset.font=o.font||"";
+  if(o.sx) el.dataset.sx=o.sx; if(o.sy) el.dataset.sy=o.sy;
   const inner=document.createElement("div"); inner.className="inner"; inner.setAttribute("contenteditable","true");
   if(o.font) inner.style.fontFamily=fontCss(o.font);
   if(o.color) inner.style.color=o.color;
+  if(o.sx&&o.sy) inner.style.transform="scale("+o.sx+","+o.sy+")";
   inner.textContent=o.txt;
   el.appendChild(inner);
   [["move","move"],["moveR","move"],["n","n"],["s","s"],["e","e"],["w","w"]].forEach(p=>{ const h=document.createElement("div"); h.className="h "+p[0]; h.dataset.act=p[1]; el.appendChild(h); });
   inner.addEventListener("focus",()=>{ beforeEdit=snapshot(); editPushed=false; });
-  inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } layoutEl(el); debSave(); });
+  inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } debSave(); }); // NO re-ajusta: las letras quedan fijas al editar
   inner.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); inner.blur();} });
   el.addEventListener("mousedown",e=>{ if(e.target.classList.contains("h"))return; selectEl(el); });
   el.addEventListener("click",e=>{ if(e.target.classList.contains("h"))return; if(document.activeElement!==inner) inner.focus(); });
@@ -353,12 +359,12 @@ function startDrag(e,el,act){
   e.target.setPointerCapture(e.pointerId);
   const mv=ev=>{
     const dx=(ev.clientX-sx)/cw, dy=(ev.clientY-sy)/ch;
-    if(act==="move"){ el.dataset.fx=Math.max(-0.2,Math.min(1-Math.min(fw,0.12),fx+dx)); el.dataset.fy=Math.max(-0.2,Math.min(1-Math.min(fh,0.12),fy+dy)); }
+    if(act==="move"){ el.dataset.fx=Math.max(-0.2,Math.min(1-Math.min(fw,0.12),fx+dx)); el.dataset.fy=Math.max(-0.2,Math.min(1-Math.min(fh,0.12),fy+dy)); placeEl(el); return; }
     else if(act==="e"){ el.dataset.fw=Math.max(0.03,fw+dx); }
     else if(act==="w"){ const w2=Math.max(0.03,fw-dx); el.dataset.fx=fx+(fw-w2); el.dataset.fw=w2; }
     else if(act==="s"){ el.dataset.fh=Math.max(0.03,fh+dy); }
     else if(act==="n"){ const h2=Math.max(0.03,fh-dy); el.dataset.fy=fy+(fh-h2); el.dataset.fh=h2; }
-    layoutEl(el);
+    fitEl(el);   // estira las letras para llenar el nuevo ancho/alto
   };
   const up=ev=>{ try{e.target.releasePointerCapture(e.pointerId);}catch(_){ } e.target.removeEventListener("pointermove",mv); e.target.removeEventListener("pointerup",up); save(); };
   e.target.addEventListener("pointermove",mv); e.target.addEventListener("pointerup",up);
@@ -500,7 +506,7 @@ async function setType(t){
 
 // ---- controles hoja ----
 function applyCellSize(){ clearTagInline(); applyVars();
-  requestAnimationFrame(()=>{ grid.querySelectorAll(".el").forEach(refitFrac); relayoutAll(); save(); saveSet(); }); }
+  requestAnimationFrame(()=>{ grid.querySelectorAll(".el").forEach(fitEl); save(); saveSet(); }); }
 cwEl.addEventListener("input",applyCellSize);
 chEl.addEventListener("input",applyCellSize);
 colsEl.addEventListener("input",applyCellSize);
@@ -519,14 +525,14 @@ document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Vo
 document.getElementById("print").addEventListener("click",()=>window.print());
 
 // ---- fuente / tamaño global ----
-document.getElementById("fontAll").addEventListener("change",e=>{ pushHistory(); const f=e.target.value; grid.querySelectorAll(".el").forEach(el=>{ el.dataset.font=f; el.querySelector(".inner").style.fontFamily=fontCss(f); layoutEl(el); }); save(); });
-function scaleAll(k){ pushHistory(); grid.querySelectorAll(".el").forEach(el=>{ el.dataset.fw=Math.max(0.03,el.dataset.fw*k); el.dataset.fh=Math.max(0.03,el.dataset.fh*k); layoutEl(el); }); save(); }
+document.getElementById("fontAll").addEventListener("change",e=>{ pushHistory(); const f=e.target.value; grid.querySelectorAll(".el").forEach(el=>{ el.dataset.font=f; el.querySelector(".inner").style.fontFamily=fontCss(f); fitEl(el); }); save(); });
+function scaleAll(k){ pushHistory(); grid.querySelectorAll(".el").forEach(el=>{ el.dataset.fw=Math.max(0.03,el.dataset.fw*k); el.dataset.fh=Math.max(0.03,el.dataset.fh*k); fitEl(el); }); save(); }
 document.getElementById("allPlus").addEventListener("click",()=>scaleAll(1.1));
 document.getElementById("allMinus").addEventListener("click",()=>scaleAll(0.9));
 
 // ---- fuente / tamaño / color del seleccionado ----
-document.getElementById("fontSel").addEventListener("change",e=>{ if(!selEl)return; pushHistory(); selEl.dataset.font=e.target.value; selEl.querySelector(".inner").style.fontFamily=fontCss(e.target.value); layoutEl(selEl); save(); });
-function selScale(kw,kh){ if(!selEl)return; pushHistory(); selEl.dataset.fw=Math.max(0.03,selEl.dataset.fw*kw); selEl.dataset.fh=Math.max(0.03,selEl.dataset.fh*kh); layoutEl(selEl); save(); }
+document.getElementById("fontSel").addEventListener("change",e=>{ if(!selEl)return; pushHistory(); selEl.dataset.font=e.target.value; selEl.querySelector(".inner").style.fontFamily=fontCss(e.target.value); fitEl(selEl); save(); });
+function selScale(kw,kh){ if(!selEl)return; pushHistory(); selEl.dataset.fw=Math.max(0.03,selEl.dataset.fw*kw); selEl.dataset.fh=Math.max(0.03,selEl.dataset.fh*kh); fitEl(selEl); save(); }
 document.getElementById("selPlus").addEventListener("click",()=>selScale(1.12,1.12));
 document.getElementById("selMinus").addEventListener("click",()=>selScale(0.89,0.89));
 document.getElementById("selWmore").addEventListener("click",()=>selScale(1.12,1));
