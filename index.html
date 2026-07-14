@@ -88,6 +88,11 @@
   .tag:hover .addtx, .tag:has(.el.sel) .addtx{ display:block; }
   .tag:hover .del, .tag:has(.el.sel) .del{ display:block; }
 
+  /* tirador para ajustar el cuadro completo (solo en Libre) */
+  .tagresize{ position:absolute; right:-2px; bottom:-2px; width:28px; height:28px; cursor:nwse-resize; display:none; z-index:12; touch-action:none; background:linear-gradient(135deg,transparent 42%,#c0121f 42%); }
+  .tagresize::after{ content:""; position:absolute; right:4px; bottom:4px; width:9px; height:9px; border-right:3px solid #fff; border-bottom:3px solid #fff; }
+  .grid.libre .tag .tagresize{ display:block; }
+
   /* modal */
   .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100; align-items:flex-start; justify-content:center; padding:30px 14px; overflow:auto; }
   .modal.show{ display:flex; }
@@ -101,7 +106,7 @@
 
   @media print{
     html,body{ background:#fff; }
-    .toolbar,.del,.h,.addtx,.modal{ display:none !important; }
+    .toolbar,.del,.h,.addtx,.tagresize,.modal{ display:none !important; }
     .sheet-wrap{ padding:0; overflow:visible; } .grid{ box-shadow:none; }
     .tag{ break-inside:avoid; } .el.sel{ outline:none; } .inner:focus{ background:none; }
   }
@@ -245,7 +250,7 @@ const TYPES={
  cecinas:   {label:"Cecinas",  cat:"CECINAS", catPos:"top", wmm:90,  hmm:130, cols:2, orient:"portrait",  fil:2},
  carnes:    {label:"Carnes",   cat:"CARNES",  catPos:"top", wmm:130, hmm:90,  cols:2, orient:"landscape", fil:2},
  ofertas:   {label:"Ofertas",  cat:"OFERTAS", catPos:"top", wmm:200, hmm:130, cols:1, orient:"portrait",  fil:2},
- libre:     {label:"Libre",    cat:"", catPos:"top", wmm:80,  hmm:50,  cols:3, orient:"portrait",  fil:0},
+ libre:     {label:"Libre",    cat:"", catPos:"top", wmm:80,  hmm:50,  cols:1, orient:"portrait",  fil:0},
 };
 const ABA=[
  ["VINAGRE","BLANCO TINTO 500CC","1.020"],["VINAGRE","MANZANA 500CC","2.020"],["CHORITOS","SAN JOSE","1.760"],
@@ -262,7 +267,7 @@ const SEED={
  cecinas:[["JAMON","ARTESANAL KG","6.990"],["SALAME","KG","8.490"],["MORTADELA","KG","3.990"],["VIENESAS","SUPER CERDO KG","4.290"]],
  carnes:[["LOMO VETADO","KG","9.990"],["ASADO","DE TIRA KG","7.990"],["MOLIDA","ESPECIAL KG","6.490"],["POLLO","ENTERO KG","3.290"]],
  ofertas:[["OFERTA","DEL DÍA","1.990"],["OFERTA","FIN DE SEMANA","2.990"]],
- libre:[["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"]]
+ libre:[["PRODUCTO","","000"]]
 };
 
 const grid=document.getElementById("grid");
@@ -396,6 +401,29 @@ function addExtra(tag){
     t.focus(); try{ const r=document.createRange(); r.selectNodeContents(t); const s=getSelection(); s.removeAllRanges(); s.addRange(r); }catch(_){ } });
   save(); return el;
 }
+// tirador de la esquina: ajusta el CUADRO completo (ancho/alto en cm), ligado a la impresión. Solo se ve en Libre.
+function addTagGrip(tag){
+  const g=document.createElement("div"); g.className="tagresize"; g.title="Arrastra para ajustar el tamaño del cuadro";
+  g.addEventListener("pointerdown",e=>{
+    e.preventDefault(); e.stopPropagation();
+    const pxpcW=(tag.clientWidth||1)/(parseFloat(cwEl.value)||1);
+    const pxpcH=(tag.clientHeight||1)/(parseFloat(chEl.value)||1);
+    const sx=e.clientX, sy=e.clientY, w0=parseFloat(cwEl.value)||8, h0=parseFloat(chEl.value)||5;
+    try{ g.setPointerCapture(e.pointerId); }catch(_){ }
+    const mv=ev=>{
+      const w=Math.max(2,Math.min(21, w0+(ev.clientX-sx)/pxpcW));
+      const h=Math.max(2,Math.min(29, h0+(ev.clientY-sy)/pxpcH));
+      cwEl.value=w.toFixed(1); chEl.value=h.toFixed(1);
+      applyVars(); relayoutAll();
+    };
+    const up=()=>{ try{ g.releasePointerCapture(e.pointerId); }catch(_){ }
+      g.removeEventListener("pointermove",mv); g.removeEventListener("pointerup",up);
+      const cfg=TYPES[TYPE]; document.getElementById("typeinfo").textContent="· "+cwEl.value+"×"+chEl.value+" cm · "+colsEl.value+" col · "+(curOrient==="landscape"?"hoja horizontal":"hoja vertical");
+      saveSet(); save(); };
+    g.addEventListener("pointermove",mv); g.addEventListener("pointerup",up);
+  });
+  tag.appendChild(g);
+}
 function makeTag(o){
   const tag=document.createElement("div"); tag.className="tag";
   const addb=document.createElement("button"); addb.className="addtx"; addb.textContent="＋"; addb.title="Agregar una línea o un texto (lo puedes mover)";
@@ -411,6 +439,7 @@ function makeTag(o){
     if(money && (money.txt||"").trim().length) tag.appendChild(makeEl("money",money));
   }
   (o.extras||[]).forEach(ex=> tag.appendChild(makeEl("extra",ex)));
+  addTagGrip(tag);
   return tag;
 }
 
@@ -443,6 +472,7 @@ async function setType(t){
   cwEl.value=st.cw; chEl.value=st.ch; colsEl.value=st.cols; curOrient=st.orient||cfg.orient;
   document.getElementById("orient").value=curOrient;
   applyVars();
+  grid.classList.toggle("libre", t==="libre");
   document.querySelectorAll(".typebtn").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
   document.getElementById("typeinfo").textContent="· "+cwEl.value+"×"+chEl.value+" cm · "+colsEl.value+" col · "+(curOrient==="landscape"?"hoja horizontal":"hoja vertical")+(cfg.fil?" · sugerido "+cfg.cols+"×"+cfg.fil:"");
   clearSel(); history=[];
@@ -471,7 +501,7 @@ document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastE
   const t=makeTag({title:g("title"),sub:g("sub"),price:g("price"),money:g("money"),extras:exs}); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
 document.getElementById("undo").addEventListener("click",undo);
 document.getElementById("newsheet").addEventListener("click",()=>{ if(!confirm("¿Hoja NUEVA y vacía de este tipo?\n\nGuarda antes con 💾 si no quieres perder lo actual.")) return;
-  pushHistory(); const blank=()=>seedTag(TYPES[TYPE],["PRODUCTO","","000"]); clearSel(); render([blank(),blank(),blank()]); });
+  pushHistory(); const blank=()=>seedTag(TYPES[TYPE],["PRODUCTO","","000"]); const n=TYPE==="libre"?1:3; clearSel(); render(Array.from({length:n},blank)); });
 document.getElementById("reset").addEventListener("click",()=>{ if(confirm("¿Volver a los ejemplos de este tipo? Se pierden los cambios.")){ pushHistory(); localStorage.removeItem(dataKey(TYPE)); clearSel(); render(seedDefault(TYPE)); } });
 document.getElementById("print").addEventListener("click",()=>window.print());
 
