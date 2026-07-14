@@ -69,6 +69,7 @@
   .el.title .inner{ color:#000; } .el.sub .inner{ color:#000; } .el.cat .inner{ color:#000; } .el.extra .inner{ color:#000; }
   .el.price .inner, .el.money .inner{ color:#e30613; }
   .inner:focus{ background:#fff7cc; }
+  .inner:empty::before{ content:"texto"; color:#cfcfcf; }
   .el.sel{ outline:1.5px dashed #2b7cff; }
 
   .h{ position:absolute; display:none; z-index:8; touch-action:none; background:transparent; }
@@ -150,6 +151,7 @@
     <button class="typebtn" data-type="cecinas">Cecinas</button>
     <button class="typebtn" data-type="carnes">Carnes</button>
     <button class="typebtn" data-type="ofertas">Ofertas</button>
+    <button class="typebtn" data-type="libre">＋ Libre</button>
     <span class="typeinfo" id="typeinfo"></span>
   </div>
 
@@ -158,6 +160,7 @@
     <div class="grp"><label>Columnas</label><input type="number" id="cols" min="1" max="6" value="2"></div>
     <div class="grp"><label>Ancho cm</label><input type="number" id="cw" min="2" max="21" step="0.1" value="9"></div>
     <div class="grp"><label>Alto cm</label><input type="number" id="ch" min="2" max="29" step="0.1" value="6.5"></div>
+    <div class="grp"><label>Hoja</label><select id="orient"><option value="portrait">Vertical</option><option value="landscape">Horizontal</option></select></div>
     <button class="btn-eq" id="eq" title="Aplica el tamaño a todos los cuadros (parejo para cortar)">▦ Igualar cuadros</button>
     <span class="vsep"></span>
     <button class="btn-add" id="add">＋ Agregar</button>
@@ -242,6 +245,7 @@ const TYPES={
  cecinas:   {label:"Cecinas",  cat:"CECINAS", catPos:"top", wmm:90,  hmm:130, cols:2, orient:"portrait",  fil:2},
  carnes:    {label:"Carnes",   cat:"CARNES",  catPos:"top", wmm:130, hmm:90,  cols:2, orient:"landscape", fil:2},
  ofertas:   {label:"Ofertas",  cat:"OFERTAS", catPos:"top", wmm:200, hmm:130, cols:1, orient:"portrait",  fil:2},
+ libre:     {label:"Libre",    cat:"", catPos:"top", wmm:80,  hmm:50,  cols:3, orient:"portrait",  fil:0},
 };
 const ABA=[
  ["VINAGRE","BLANCO TINTO 500CC","1.020"],["VINAGRE","MANZANA 500CC","2.020"],["CHORITOS","SAN JOSE","1.760"],
@@ -257,7 +261,8 @@ const SEED={
  abarrotes2: ABA,
  cecinas:[["JAMON","ARTESANAL KG","6.990"],["SALAME","KG","8.490"],["MORTADELA","KG","3.990"],["VIENESAS","SUPER CERDO KG","4.290"]],
  carnes:[["LOMO VETADO","KG","9.990"],["ASADO","DE TIRA KG","7.990"],["MOLIDA","ESPECIAL KG","6.490"],["POLLO","ENTERO KG","3.290"]],
- ofertas:[["OFERTA","DEL DÍA","1.990"],["OFERTA","FIN DE SEMANA","2.990"]]
+ ofertas:[["OFERTA","DEL DÍA","1.990"],["OFERTA","FIN DE SEMANA","2.990"]],
+ libre:[["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"],["PRODUCTO","","000"]]
 };
 
 const grid=document.getElementById("grid");
@@ -273,6 +278,7 @@ async function cloudSave(t,arr){ if(!sb){ setCloud("💾 Solo local","err"); ret
 const cloudSaveDeb=(()=>{let id;return()=>{ setCloud("☁️ Guardando…","saving"); clearTimeout(id); id=setTimeout(()=>cloudSave(TYPE, serialize()),700); };})();
 const SKEY="letreros_myg_type";
 let TYPE=localStorage.getItem(SKEY)||"abarrotes1";
+let curOrient="portrait";
 let selEl=null;
 let history=[], beforeEdit=null, editPushed=false;
 function snapshot(){ return JSON.stringify(serialize()); }
@@ -296,17 +302,18 @@ function serialize(){
   });
 }
 function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} cloudSaveDeb(); }
-function saveSet(){ try{ localStorage.setItem(setKeyName(TYPE), JSON.stringify({cw:cwEl.value,ch:chEl.value,cols:colsEl.value})); }catch(e){} }
+function saveSet(){ try{ localStorage.setItem(setKeyName(TYPE), JSON.stringify({cw:cwEl.value,ch:chEl.value,cols:colsEl.value,orient:curOrient})); }catch(e){} }
 const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
 
 function layoutEl(el){
-  const tag=el.closest(".tag"); const cw=tag.clientWidth, ch=tag.clientHeight;
+  const tag=el.closest(".tag"); if(!tag)return; const cw=tag.clientWidth, ch=tag.clientHeight;
   const W=el.dataset.fw*cw, H=el.dataset.fh*ch;
   el.style.left=(el.dataset.fx*cw)+"px"; el.style.top=(el.dataset.fy*ch)+"px";
   el.style.width=W+"px"; el.style.height=H+"px";
   const inner=el.querySelector(".inner");
   const nw=inner.offsetWidth||1, nh=inner.offsetHeight||1;
-  inner.style.transform="scale("+(W/nw)+","+(H/nh)+")";
+  const s=Math.min(W/nw, H/nh);                 // escala uniforme: no distorsiona ni reordena al editar
+  inner.style.transform="translate("+((W-nw*s)/2)+"px,"+((H-nh*s)/2)+"px) scale("+s+")"; // texto centrado en su caja
 }
 function relayoutAll(){ grid.querySelectorAll(".el").forEach(layoutEl); }
 function cellPx(){ const t=grid.querySelector(".tag"); if(t&&t.clientWidth&&t.clientHeight) return [t.clientWidth,t.clientHeight];
@@ -329,6 +336,7 @@ function makeEl(role,o){
   inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } layoutEl(el); debSave(); });
   inner.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); inner.blur();} });
   el.addEventListener("mousedown",e=>{ if(e.target.classList.contains("h"))return; selectEl(el); });
+  el.addEventListener("click",e=>{ if(e.target.classList.contains("h"))return; if(document.activeElement!==inner) inner.focus(); });
   el.querySelectorAll(".h").forEach(h=>h.addEventListener("pointerdown",e=>startDrag(e,el,h.dataset.act)));
   return el;
 }
@@ -421,7 +429,7 @@ function applyVars(){
   document.documentElement.style.setProperty("--cw",(cwEl.value||9)+"cm");
   document.documentElement.style.setProperty("--ch",(chEl.value||6.5)+"cm");
   document.documentElement.style.setProperty("--cols",colsEl.value||2);
-  const orient=TYPES[TYPE].orient;
+  const orient=curOrient;
   const W = orient==="landscape" ? 297 : 210;   // ancho real A4 en mm segun orientacion
   // margen 0 + ancho de hoja fijo => Safari/Chrome NO encogen el contenido al imprimir
   pagestyle.textContent =
@@ -431,11 +439,12 @@ function applyVars(){
 }
 async function setType(t){
   TYPE=t; localStorage.setItem(SKEY,t);
-  const cfg=TYPES[t]; const st=loadSet(t)||{cw:cfg.wmm/10, ch:cfg.hmm/10, cols:cfg.cols};
-  cwEl.value=st.cw; chEl.value=st.ch; colsEl.value=st.cols;
+  const cfg=TYPES[t]; const st=loadSet(t)||{cw:cfg.wmm/10, ch:cfg.hmm/10, cols:cfg.cols, orient:cfg.orient};
+  cwEl.value=st.cw; chEl.value=st.ch; colsEl.value=st.cols; curOrient=st.orient||cfg.orient;
+  document.getElementById("orient").value=curOrient;
   applyVars();
   document.querySelectorAll(".typebtn").forEach(b=>b.classList.toggle("active",b.dataset.type===t));
-  document.getElementById("typeinfo").textContent="· "+cfg.wmm/10+"×"+cfg.hmm/10+" cm · "+cfg.cols+" col · "+(cfg.orient==="landscape"?"hoja horizontal":"hoja vertical")+" · sugerido "+cfg.cols+"×"+cfg.fil;
+  document.getElementById("typeinfo").textContent="· "+cwEl.value+"×"+chEl.value+" cm · "+colsEl.value+" col · "+(curOrient==="landscape"?"hoja horizontal":"hoja vertical")+(cfg.fil?" · sugerido "+cfg.cols+"×"+cfg.fil:"");
   clearSel(); history=[];
   setCloud("☁️ Cargando…","saving");
   let data = await cloudLoad(t);                 // array=hay datos · null=no hay fila · undefined=error
@@ -452,6 +461,8 @@ function applyCellSize(){ clearTagInline(); applyVars();
 cwEl.addEventListener("input",applyCellSize);
 chEl.addEventListener("input",applyCellSize);
 colsEl.addEventListener("input",applyCellSize);
+document.getElementById("orient").addEventListener("change",e=>{ curOrient=e.target.value; applyVars(); requestAnimationFrame(relayoutAll); saveSet();
+  const cfg=TYPES[TYPE]; document.getElementById("typeinfo").textContent="· "+cwEl.value+"×"+chEl.value+" cm · "+colsEl.value+" col · "+(curOrient==="landscape"?"hoja horizontal":"hoja vertical")+(cfg.fil?" · sugerido "+cfg.cols+"×"+cfg.fil:""); });
 document.getElementById("eq").addEventListener("click",()=>{ pushHistory(); applyCellSize(); });
 document.getElementById("add").addEventListener("click",()=>{ pushHistory(); const t=makeTag(seedTag(TYPES[TYPE],["PRODUCTO","","000"])); grid.appendChild(t); requestAnimationFrame(()=>{t.querySelectorAll(".el").forEach(layoutEl);save();}); });
 document.getElementById("dup").addEventListener("click",()=>{ const b=grid.lastElementChild; if(!b)return; pushHistory();
