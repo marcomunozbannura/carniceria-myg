@@ -458,6 +458,17 @@ function applyVars(){
   document.documentElement.style.setProperty("--cw",(cwEl.value||9)+"cm");
   document.documentElement.style.setProperty("--ch",(chEl.value||6.5)+"cm");
   document.documentElement.style.setProperty("--cols",colsEl.value||2);
+  // LIBRE: la hoja de impresión toma EXACTAMENTE el tamaño del cuadro
+  // => el letrero sale pegado arriba-izquierda, a tamaño real, sin espacio en blanco ni quedar corrido.
+  if(TYPE==="libre"){
+    const w=parseFloat(cwEl.value)||8, h=parseFloat(chEl.value)||5;
+    pagestyle.textContent =
+      "@page{ size:"+w+"cm "+h+"cm; margin:0; }"+
+      "@media print{ html,body{ width:"+w+"cm; min-width:0; margin:0; padding:0; } "+
+      ".sheet-wrap{ width:"+w+"cm; padding:0; margin:0; justify-content:flex-start; } "+
+      ".grid{ width:"+w+"cm; } }";
+    return;
+  }
   const orient=curOrient;
   const W = orient==="landscape" ? 297 : 210;   // ancho real A4 en mm segun orientacion
   const H = orient==="landscape" ? 210 : 297;   // alto real A4 en mm segun orientacion
