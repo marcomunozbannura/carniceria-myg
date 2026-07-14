@@ -460,9 +460,11 @@ function applyVars(){
   document.documentElement.style.setProperty("--cols",colsEl.value||2);
   const orient=curOrient;
   const W = orient==="landscape" ? 297 : 210;   // ancho real A4 en mm segun orientacion
+  const H = orient==="landscape" ? 210 : 297;   // alto real A4 en mm segun orientacion
+  // dimensiones EXPLÍCITAS en mm (no la palabra "landscape", que muchos navegadores ignoran)
   // margen 0 + ancho de hoja fijo => Safari/Chrome NO encogen el contenido al imprimir
   pagestyle.textContent =
-    "@page{ size:A4 "+orient+"; margin:0; }"+
+    "@page{ size:"+W+"mm "+H+"mm; margin:0; }"+
     "@media print{ html,body{ width:"+W+"mm; min-width:"+W+"mm; margin:0; padding:0; } "+
     ".sheet-wrap{ width:"+W+"mm; padding:0; margin:0; justify-content:center; } }";
 }
