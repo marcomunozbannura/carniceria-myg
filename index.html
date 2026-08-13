@@ -286,8 +286,9 @@ let TYPE=localStorage.getItem(SKEY)||"abarrotes1";
 let curOrient="portrait";
 let selEl=null;
 let history=[], beforeEdit=null, editPushed=false;
+let userTouched=false;   // ¿el usuario ya editó algo? => no le pisamos la pantalla con datos de la nube
 function snapshot(){ return JSON.stringify(serialize()); }
-function pushHistory(){ try{ history.push(snapshot()); if(history.length>80) history.shift(); }catch(e){} }
+function pushHistory(){ userTouched=true; try{ history.push(snapshot()); if(history.length>80) history.shift(); }catch(e){} }
 function undo(){ if(!history.length) return; const s=history.pop(); clearSel(); render(JSON.parse(s)); }
 
 function fillFont(sel){ sel.innerHTML=""; FONTS.forEach(f=>{const o=document.createElement("option");o.value=f;o.textContent=f;o.style.fontFamily=f;sel.appendChild(o);}); }
@@ -306,7 +307,8 @@ function serialize(){
     return { title:g("title"), sub:g("sub"), price:g("price"), money:g("money"), extras };
   });
 }
-function save(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} cloudSaveDeb(); }
+function saveLocal(){ try{ localStorage.setItem(dataKey(TYPE), JSON.stringify(serialize())); }catch(e){} }
+function save(){ saveLocal(); cloudSaveDeb(); }
 function saveSet(){ try{ localStorage.setItem(setKeyName(TYPE), JSON.stringify({cw:cwEl.value,ch:chEl.value,cols:colsEl.value,orient:curOrient})); }catch(e){} }
 const debSave=(()=>{let id;return()=>{clearTimeout(id);id=setTimeout(save,250);};})();
 
@@ -344,7 +346,7 @@ function makeEl(role,o){
   el.appendChild(inner);
   [["move","move"],["moveR","move"],["n","n"],["s","s"],["e","e"],["w","w"]].forEach(p=>{ const h=document.createElement("div"); h.className="h "+p[0]; h.dataset.act=p[1]; el.appendChild(h); });
   inner.addEventListener("focus",()=>{ beforeEdit=snapshot(); editPushed=false; });
-  inner.addEventListener("input",()=>{ if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } debSave(); }); // NO re-ajusta: las letras quedan fijas al editar
+  inner.addEventListener("input",()=>{ userTouched=true; if(!editPushed&&beforeEdit){ history.push(beforeEdit); if(history.length>80)history.shift(); editPushed=true; } debSave(); }); // NO re-ajusta: las letras quedan fijas al editar
   inner.addEventListener("keydown",e=>{ if(e.key==="Enter"){e.preventDefault(); inner.blur();} });
   el.addEventListener("mousedown",e=>{ if(e.target.classList.contains("h"))return; selectEl(el); });
   el.addEventListener("click",e=>{ if(e.target.classList.contains("h"))return; if(document.activeElement!==inner) inner.focus(); });
@@ -454,10 +456,11 @@ function clearSel(){ if(selEl)selEl.classList.remove("sel"); selEl=null; syncSel
 function syncSel(){ const bar=document.getElementById("selbar"); if(!selEl){bar.classList.add("off");return;} bar.classList.remove("off");
   const f=(selEl.dataset.font||HIRA); document.getElementById("fontSel").value=FONTS.includes(f)?f:FONTS[0]; }
 
-function render(data){
+function render(data,noCloud){
   grid.innerHTML="";
   (data||[]).forEach(o=>grid.appendChild(makeTag(o)));
-  requestAnimationFrame(()=>{ relayoutAll(); save(); });
+  // noCloud: cargamos sin nube (dormida/sin internet) => guardar SOLO local, para NO pisar lo bueno de la nube
+  requestAnimationFrame(()=>{ relayoutAll(); if(noCloud) saveLocal(); else save(); });
 }
 
 function applyVars(){
@@ -496,12 +499,33 @@ async function setType(t){
   document.getElementById("typeinfo").textContent="· "+cwEl.value+"×"+chEl.value+" cm · "+colsEl.value+" col · "+(curOrient==="landscape"?"hoja horizontal":"hoja vertical")+(cfg.fil?" · sugerido "+cfg.cols+"×"+cfg.fil:"");
   clearSel(); history=[];
   setCloud("☁️ Cargando…","saving");
+  userTouched=false;
   let data = await cloudLoad(t);                 // array=hay datos · null=no hay fila · undefined=error
-  if(data===undefined){ setCloud("⚠️ Sin conexión","err"); data = loadType(t); }
-  else if(data===null){ data = loadType(t) || seedDefault(t); }   // 1ra vez: sube lo local/ejemplos a la nube via save()
-  else { setCloud("☁️ Guardado","ok"); }
   if(t!==TYPE) return;                            // si cambió de tipo mientras cargaba, abortar
+  if(data===undefined){                           // la nube no responde (base dormida o sin internet)
+    setCloud("⚠️ Sin conexión","err");
+    render(loadType(t) || seedDefault(t), true);  // NUNCA dejar el panel vacío; y NO subir esto a la nube
+    retryCloud(t);                                // se recupera solo apenas la nube despierte
+    return;
+  }
+  if(data===null){ data = loadType(t) || seedDefault(t); }   // 1ra vez: sube lo local/ejemplos a la nube via save()
+  else { setCloud("☁️ Guardado","ok"); }
   render(data);
+}
+// La base puede estar dormida y tardar en despertar: reintenta y carga lo real apenas responda,
+// siempre que el usuario no haya empezado a editar (para no borrarle lo que está haciendo).
+function retryCloud(t){
+  let n=0;
+  const tick=async()=>{
+    if(t!==TYPE) return;
+    n++; setCloud("☁️ Reconectando…","saving");
+    const d=await cloudLoad(t);
+    if(t!==TYPE) return;
+    if(d===undefined){ setCloud("⚠️ Sin conexión","err"); if(n<8) setTimeout(tick,5000); return; }
+    setCloud("☁️ Guardado","ok");
+    if(!userTouched && d && d.length) render(d);
+  };
+  setTimeout(tick,4000);
 }
 
 // ---- controles hoja ----
